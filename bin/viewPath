@@ -1,0 +1,27 @@
+#!/usr/bin/env python
+
+
+
+
+from bumblebee.motion import *
+
+from simulation.path import *
+from simulation.settings import *
+import tf.transformations
+from geometry_msgs.msg import TransformStamped,Transform,Quaternion,Vector3
+
+import pickle
+import os
+import rospy
+
+import time
+
+rospy.init_node("display_path")
+disp=pathViewer()
+
+disp.loadFromFile("/media/ryan/EXTRA/Simulation/Motion")
+
+
+while(True):
+    disp.publish()
+    time.sleep(0.1)
