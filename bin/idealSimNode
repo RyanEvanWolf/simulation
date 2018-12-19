@@ -1,0 +1,13 @@
+#!/usr/bin/env python
+
+import rospy
+from simulation.dataset import stereo_simulator_node
+
+
+rospy.init_node("ideal_simulation_node")
+
+
+bumble=stereo_simulator_node()
+
+
+rospy.spin()

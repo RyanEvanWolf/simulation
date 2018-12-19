@@ -24,9 +24,9 @@ def MotionCategorySettings():
 
 def getSimulatedLandmarkSettings():
     Settings={}
-    Settings["Xdepth"]=5.0
-    Settings["Ydepth"]=5.0
-    Settings["Zdepth"]=4.0
+    Settings["Xdepth"]=2
+    Settings["Ydepth"]=2
+    Settings["Zdepth"]=2
     Settings["HeightMaximum"]=0.5
     Settings["MinimumOutlier"]=4.0 #pixels
     Settings["OutlierLevels"]=[0.05,0.12,0.2]

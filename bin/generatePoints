@@ -26,6 +26,8 @@ sim=idealSimulator(lSettings,bumblebee.kSettings,400)
 sim.run("/media/ryan/EXTRA/Simulation/Motion")
 
 
+sim.dumpTo("/media/ryan/EXTRA/Simulation/Landmarks")
+
 sim.publishLandmarks()
 
 rospy.spin()

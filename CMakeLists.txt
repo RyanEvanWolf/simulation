@@ -72,8 +72,11 @@ catkin_python_setup()
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-#  add_message_files(
-#    FILES
+ add_message_files(
+   FILES
+   simLandmark.msg
+   simStereo.msg
+ )
 #   #  extractSettings.msg
 #   #  ORB.msg
 #   #  FAST.msg
@@ -86,6 +89,7 @@ catkin_python_setup()
 ## Generate services in the 'srv' folder
  add_service_files(
    FILES
+   idealSimulation.srv
   #  extractFeatures.srv
   #  extractFAST.srv
   #  extractSIFT.srv

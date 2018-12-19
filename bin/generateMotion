@@ -26,8 +26,6 @@ from simulation.settings import *
 import tf.transformations
 from geometry_msgs.msg import TransformStamped,Transform,Quaternion,Vector3
 
-import pickle
-import os
 import rospy
 
 import time
@@ -52,12 +50,14 @@ rospy.init_node("nd")
 
 motions=genStraightTransform(mset["Medium"],nFrames)
 
-print(len(motions))
 
-for n in range(0,len(motions)):
-    fileName="/media/ryan/EXTRA/Simulation/Motion/"+str(n).zfill(4)+".p"
-    with open(fileName, 'wb') as infile:
-        pickle.dump(motions[n],infile)
+
+# print(len(motions))
+
+# for n in range(0,len(motions)):
+#     fileName="/media/ryan/EXTRA/Simulation/Motion/"+str(n).zfill(4)+".p"
+#     with open(fileName, 'wb') as infile:
+#         pickle.dump(motions[n],infile)
 
 
 # ###########

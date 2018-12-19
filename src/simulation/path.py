@@ -3,12 +3,18 @@ import numpy as np
 from tf.transformations import quaternion_from_euler,quaternion_matrix,euler_from_matrix
 
 from tf import TransformBroadcaster
+import tf2_ros
+import time
+
+
 from geometry_msgs.msg import Pose,TransformStamped
 from math import pi,radians,degrees
 import os
 import rospy
 from visualization_msgs.msg import Marker,MarkerArray
+import copy
 
+import threading
 import pickle
 
 def MotionCategorySettings():
@@ -24,7 +30,7 @@ def MotionCategorySettings():
     Settings["Medium"]["TranslationMean"]=0.044
     Settings["Medium"]["RotationMean"]=20
     Settings["Medium"]["TranslationNoise"]=0.1*Settings["Medium"]["TranslationMean"] ##meters
-    Settings["Medium"]["RotationNoise"]=1        ##degrees
+    Settings["Medium"]["RotationNoise"]=0.2        ##degrees
 
     Settings["Slow"]["TranslationMean"]=0.022
     Settings["Slow"]["RotationMean"]=10
@@ -35,9 +41,9 @@ def MotionCategorySettings():
 
 def noisyRotations(noise=5):
     out=np.zeros((3,1))
-    out[0,0]=np.random.normal(0,noise,1)
-    out[1,0]=np.random.normal(0,noise*0.1,1)
-    out[2,0]=np.random.normal(0,noise,1)
+    out[0,0]=np.clip(np.random.normal(0,noise,1),-2,2)
+    out[1,0]=np.clip(np.random.normal(0,noise,1),-2,2)
+    out[2,0]=np.clip(np.random.normal(0,noise,1),-2,2)
     return out
 
 
@@ -80,6 +86,58 @@ def genTurningTransform(mSettings,nFrames=2):
         Rtheta=dominantRotation(mSettings["RotationMean"],mSettings["RotationNoise"])
         setTransforms.append((Rtheta,C))
     return setTransforms  
+
+
+class simTFpub(threading.Thread):
+    def __init__(self,motionSet,pubName="simulation"):
+        threading.Thread.__init__(self)
+        self.pubName=pubName
+        self.input=copy.deepcopy(motionSet)
+        self.tfMessages=[]
+        self.frameNames=[self.pubName]
+        self.isDaemon=True
+        for i in range(0,len(motionSet)):
+            self.frameNames.append(str(i).zfill(8))
+        
+        origin=TransformStamped()
+        origin.header.frame_id="world"
+        origin.child_frame_id=self.pubName
+        origin.transform.rotation.w=1
+        self.tfMessages.append(origin)
+
+
+        for m in range(0,len(self.input)):
+            Rtheta,C=self.input[m][0],self.input[m][1]
+            q=quaternion_from_euler(radians(Rtheta[0]),
+                                radians(Rtheta[1]),
+                                radians(Rtheta[2]),
+                                'szxy')  
+            latestPose=TransformStamped()
+            latestPose.header.frame_id=self.frameNames[m]
+            latestPose.child_frame_id=self.frameNames[m+1]
+
+            latestPose.transform.translation.x=C[0,0]
+            latestPose.transform.translation.y=C[1,0]
+            latestPose.transform.translation.z=C[2,0]
+            latestPose.transform.rotation.x=q[0]
+            latestPose.transform.rotation.y=q[1]
+            latestPose.transform.rotation.z=q[2]
+            latestPose.transform.rotation.w=q[3]
+
+
+            self.tfMessages.append(latestPose)
+    def run(self):
+        br = tf2_ros.StaticTransformBroadcaster()
+        for i in self.tfMessages:
+            i.header.stamp=rospy.Time.now()
+        br.sendTransform(self.tfMessages)
+        # while(True):
+        #     # for i in self.tfMessages:
+        #     #     i.header.stamp=rospy.Time.now()
+        #     #     br.sendTransformMessage(i)
+        #     time.sleep(0.1)
+
+
 
 
 class pathViewer:
