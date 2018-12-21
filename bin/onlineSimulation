@@ -40,7 +40,7 @@ mset=MotionCategorySettings()
 
 nMotions=1
 
-totalSeconds=6
+totalSeconds=1
 
 fps=1/15.0
 
@@ -50,6 +50,8 @@ rospy.init_node("straight_path_node")
 
 
 motions=genStraightTransform(mset["Medium"],nFrames)
+#motions+=genTurningTransform(mset["Slow"],15)
+#motions+=genStraightTransform(mset["Medium"],nFrames)
 print("total delta poses",len(motions))
 
 simPath=simTFpub(motions)

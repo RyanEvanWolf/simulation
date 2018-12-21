@@ -6,6 +6,48 @@ from sensor_msgs.msg import PointCloud,ChannelFloat32
 from simulation.msg import simLandmark,simStereo
 from visualization_msgs.msg import Marker,MarkerArray
 import time
+import numpy as np 
+
+from bumblebee.stereo import *
+
+
+import cv2
+
+def rigid_transform_3D(previousLandmarks, currentLandmarks):
+    N=previousLandmarks.shape[1]
+    centroid_A = np.mean(previousLandmarks.T, axis=0)
+    centroid_B = np.mean(currentLandmarks.T, axis=0)
+
+    AA = copy.deepcopy(previousLandmarks.T - np.tile(centroid_A, (N, 1)))
+    BB = copy.deepcopy(currentLandmarks.T - np.tile(centroid_B, (N, 1)))
+    H = np.transpose(AA).dot(BB)
+
+    U, S, Vt = np.linalg.svd(H)
+    R = (Vt.T).dot( U.T)
+    # special reflection case
+    if(np.linalg.det(R) < 0):
+        Vt[2,:] *= -1
+        R = (Vt.T).dot(U.T)
+    t = -R.dot(centroid_A.T) + centroid_B.T
+
+    return R,t
+
+class svdWindow:
+    def __init__(self):
+        ####
+        self.kSettings=getCameraSettingsFromServer(cameraType="subROI")
+        self.Landmarks={}
+        self.current=None
+        self.previous=None
+    def extractMotion(self,nMaxIterations=150,terminateRMS=0.2,)
+
+
+
+def svdExtraction(previousX,currentX,Pl,Pr):
+    maxIt=150
+    minParam=3
+    go
+
 
 class simpleWindow:
     def __init__(self,stereoTopicName="/simulatedStereo"):
@@ -13,10 +55,10 @@ class simpleWindow:
         self.deltaPub=rospy.Publisher("deltaPose",Pose,queue_size=10)
         self.overallPub=rospy.Publisher("currentPose",Pose,queue_size=10)
         self.stereoPub=rospy.Publisher("currentPoints",PointCloud,queue_size=10,latch=True)
-        self.mapPub=rospy.Publisher("currentMap",MarkerArray,queue_size=10,latch=True)
         self.stereoSub=rospy.Subscriber(stereoTopicName,simStereo,self.newFrame)
         self.active=PointCloud()
-        self.seen=[]
+        self.previous=None
+        self.current=None
         self.oldMarkers=MarkerArray()
     def newFrame(self,data):
         self.active.header.frame_id=data.frame
@@ -64,7 +106,5 @@ class simpleWindow:
         self.stereoPub.publish(self.active)
         # self.mapPub.publish(self.oldMarkers)
         #################
-        ##calculate tracks
 
-
-        print(time.time(),data.frame)
+            ####first initialization
