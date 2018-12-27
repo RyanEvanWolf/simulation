@@ -16,6 +16,9 @@ import copy
 
 import threading
 import pickle
+import networkx as nx
+from bumblebee.baseTypes import slidingGraph
+
 
 def MotionCategorySettings():
     Settings={}
@@ -86,6 +89,62 @@ def genTurningTransform(mSettings,nFrames=2):
         Rtheta=dominantRotation(mSettings["RotationMean"],mSettings["RotationNoise"])
         setTransforms.append((Rtheta,C))
     return setTransforms  
+
+
+
+
+class pureOdometry(slidingGraph):
+    def __init__(self,dispName="ideal"):
+        super(pureOdometry,self).__init__(displayName=dispName)
+        self.mset=MotionCategorySettings()
+        totalSeconds=1
+
+        fps=1/15.0
+
+        nFrames=int(totalSeconds/fps)
+
+        self.newPoseVertex()
+        motions=genStraightTransform(self.mset["Medium"],nFrames)
+
+        for f in motions:
+            poseID=self.newPoseVertex()
+            
+            Rtheta=f[0]
+            C=f[1]
+            print(poseID,C)
+            q=quaternion_from_euler(radians(Rtheta[0]),
+                    radians(Rtheta[1]),
+                    radians(Rtheta[2]),
+                    'szxy')  
+            latestPose=TransformStamped()
+            latestPose.transform.translation.x=C[0,0]
+            latestPose.transform.translation.y=C[1,0]
+            latestPose.transform.translation.z=C[2,0]
+            latestPose.transform.rotation.x=q[0]
+            latestPose.transform.rotation.y=q[1]
+            latestPose.transform.rotation.z=q[2]
+            latestPose.transform.rotation.w=q[3]
+
+            self.nodes[poseID]["msg"].transform=latestPose.transform
+            # self.nodes[poseID][]
+            #             Rtheta,C=self.input[m][0],self.input[m][1]
+            # q=quaternion_from_euler(radians(Rtheta[0]),
+            #                     radians(Rtheta[1]),
+            #                     radians(Rtheta[2]),
+            #                     'szxy')  
+            # latestPose=TransformStamped()
+            # latestPose.header.frame_id=self.frameNames[m]
+            # latestPose.child_frame_id=self.frameNames[m+1]
+
+            # latestPose.transform.translation.x=C[0,0]
+            # latestPose.transform.translation.y=C[1,0]
+            # latestPose.transform.translation.z=C[2,0]
+            # latestPose.transform.rotation.x=q[0]
+            # latestPose.transform.rotation.y=q[1]
+            # latestPose.transform.rotation.z=q[2]
+            # latestPose.transform.rotation.w=q[3]
+        print(len(self.nodes()))
+
 
 
 class simTFpub(threading.Thread):
@@ -165,11 +224,10 @@ class pathViewer:
                                 radians(Rtheta[2]),
                                 'szxy')
                 count+=1
-                print(Rtheta)
-                print(C)
+                print(f)
                 latestPose=TransformStamped()
                 latestPose.header.frame_id=self.interFrameMotions[-1].child_frame_id
-                latestPose.child_frame_id=f[:f.rfind(".")]
+                latestPose.child_frame_id=self.topicName+"/"+f[:f.rfind(".")]
 
                 latestPose.transform.translation.x=C[0,0]
                 latestPose.transform.translation.y=C[1,0]

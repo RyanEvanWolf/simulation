@@ -7,7 +7,7 @@ from math import pi,radians,degrees
 from geometry_msgs.msg import Point32,PointStamped
 from visualization_msgs.msg import Marker,MarkerArray
 
-from bumblebee.stereo import *
+
 from tf import TransformListener
 import rospy
 
@@ -16,6 +16,10 @@ from geometry_msgs.msg import Pose,TransformStamped
 import msgpack
 
 from bumblebee.utils import createDir
+from bumblebee.baseTypes import slidingGraph
+import networkx as nx
+
+
 from simulation.settings import *
 
 import pickle
@@ -23,10 +27,15 @@ import pickle
 
 from simulation.srv import idealSimulation,idealSimulationResponse,idealSimulationRequest
 from simulation.msg import simLandmark,simStereo
+from simulation.path import *
 
 
-
+from bumblebee.stereo import ROIfrmMsg
+import cv2
 import os
+
+import matplotlib.pyplot as plt
+
 def ROIcheck(pt,roi):
     ###
     ##check width
@@ -119,270 +128,75 @@ class simPlayBack:
 
 
 
-
-
-class stereo_simulator_node:
+class stereo_simulator_node(slidingGraph):
     def __init__(self):
-        self.lSettings=getSimulatedLandmarkSettings()
-        self.kSettings=getCameraSettingsFromServer(cameraType="subROI")
-        self.s=rospy.Service("/idealSimulation",idealSimulation,self.genSimulation)
-        self.pub=rospy.Publisher("/simulatedStereo",simStereo,queue_size=10)
-        self.mapPub=rospy.Publisher("/dataMap",MarkerArray,queue_size=10,latch=True)
-        self.listener=TransformListener()
-        self.Landmarks={}
-    def genSimulation(self,req):
-        Landmarks={}
-        count=0     ###total landmarks created in simulation
-        print("generating new simulation")
-        for i in range(0,len(req.interMotions)-1):
-            frameTracks=0
-            currentPoseName=req.interMotions[i]
-            futurePoseName=req.interMotions[i+1]
-            added=0
-            print(currentPoseName,futurePoseName)
-            while(frameTracks<req.nTracks):
-                frameTracks=0
-                ##############
-                ##how many tracsk from current to Future?
-                for k in Landmarks.keys():
-                    if((currentPoseName in Landmarks[k].frameTracks)
-                        and (futurePoseName in Landmarks[k].frameTracks)):
-                            frameTracks+=1
-                for Extra in range(req.nTracks-frameTracks):
-                    newVertex=self.genLandmark(req.interMotions[i:])    
-                    Landmarks[str(count).zfill(7)]=newVertex
-                    count+=1 
-                    added+=1
-            print(added,count,frameTracks)
+        super(stereo_simulator_node,self).__init__(displayName="simulation")
+       # self.listener = tf2_ros.Buffer()
 
+        self.mset=MotionCategorySettings()
+        totalSeconds=5
 
-            # if(i==0):
-            #     futurePoseName=req.interMotions[i+1]
-            #     print(currentPoseName,"initializing, gen for",futurePoseName)
-            #     for n in range(req.nTracks):
-            #         data=self.genLandmark(currentPoseName,futurePoseName)
-            #         newVertex=Landmark(currentPoseName,data[0],data[1],data[2])    
-            #         Landmarks[str(count).zfill(7)]=newVertex
-            #         count+=1  
-            # else:
-            #     previousPose=req.interMotions[i-1]
-            #     #######################
-            #     ######calculate new tracked positions
-            #     for k in Landmarks.keys():
-            #         if(previousPose in Landmarks[k].frameTracks):
-                        
-            #             ########
-            #             ##check if it is still visible
-                        
-            #             ###
-            #             ##transform from first sighting into current coordinate frame
-            #             originalPoint=PointStamped()
-            #             originalPoint.point.x=Landmarks[k].X[0,0]
-            #             originalPoint.point.y=Landmarks[k].X[1,0]
-            #             originalPoint.point.z=Landmarks[k].X[2,0]
-            #             originalPoint.header.frame_id=Landmarks[k].frameTracks[0]
-            #             print("landmark cehck",Landmarks[k].frameTracks[0],currentPoseName)
-            #             PotentialPoint=self.listener.transformPoint(currentPoseName,originalPoint)
-            #             ########################
-            #             ##project it onto the cameras
-            #             hX=np.ones((4,1))
-            #             hX[0,0]=PotentialPoint.point.x
-            #             hX[1,0]=PotentialPoint.point.y
-            #             hX[2,0]=PotentialPoint.point.z
+        fps=1/15.0
 
-            #             L=self.kSettings["Pl"].dot(hX)
-            #             L/=L[2,0]
-            #             R=self.kSettings["Pr"].dot(hX)
-            #             R/=R[2,0]                    
-            #             ###if it is in front of the camera, and within the ROI, then it is valid
-            #             if(self.checkWithinROI(L) and self.checkWithinROI(R,False) and (hX[2,0]>0)):
-            #                 Landmarks[k].Ml.append(L)
-            #                 Landmarks[k].Mr.append(R)
-            #                 Landmarks[k].frameTracks.append(currentPoseName)
-            #                 frameTracks+=1
-            #             else:
-            #                 frameLosses+=1
-            #     #####
-            #     if(i==len(req.interMotions)-1):
-            #         print("last, no need to gen new landmarks")
-            #     else:
-            #         print("replace",)
-            # print(frameTracks,frameLosses,count)
-            # if(i==len(req.interMotions)-1):
-            #     print("end")
-            # else:
-            #     futurePoseName=req.interMotions[i+1]
-            # else:          
-            #     for k in Landmarks.keys():
-            #         if(currentPoseName in Landmarks[k].frameTracks):
-            #             ########
-            #             ##check if it is still visible
-                        
-            #             ###
-            #             ##transform from first sighting into current coordinate frame
-            #             originalPoint=PointStamped()
-            #             originalPoint.point.x=Landmarks[k].X[0,0]
-            #             originalPoint.point.y=Landmarks[k].X[1,0]
-            #             originalPoint.point.z=Landmarks[k].X[2,0]
-            #             originalPoint.header.frame_id=Landmarks[k].frameTracks[0]
-            #             print("landmark cehck",Landmarks[k].frameTracks[0],currentPoseName)
-                    #     PotentialPoint=self.listener.transformPoint(currentPoseName,originalPoint)
-                    #     ########################
-                    #     ##project it onto the cameras
-                    #     hX=np.ones((4,1))
-                    #     hX[0,0]=PotentialPoint.point.x
-                    #     hX[1,0]=PotentialPoint.point.y
-                    #     hX[2,0]=PotentialPoint.point.z
+        nFrames=int(totalSeconds/fps)
 
-                    #     L=self.kSettings["Pl"].dot(hX)
-                    #     L/=L[2,0]
-                    #     R=self.kSettings["Pr"].dot(hX)
-                    #     R/=R[2,0]                    
-                    #     ###if it is in front of the camera, and within the ROI, then it is valid
-                    #     if(self.checkWithinROI(L) and self.checkWithinROI(R,False) and (hX[2,0]>0)):
-                    #         Landmarks[k].Ml.append(L)
-                    #         Landmarks[k].Mr.append(R)
-                    #         Landmarks[k].frameTracks.append(currentPoseName)
-                    #         frameTracks+=1
-                    #     else:
-                    #         data=self.genLandmark()     
-                    #         newVertex=Landmark(currentPoseName,data[0],data[1],data[2])    
-                    #         Landmarks[str(count).zfill(7)]=newVertex
-                    #         count+=1
-                    #         frameLosses+=1
+        self.newPoseVertex()
+        motions=genStraightTransform(self.mset["Medium"],nFrames)
+
+        for f in motions:
+            poseID=self.newPoseVertex()
             
-        # prevPoseName=req.startName
-        # currentPoseName=None
-        # for f in req.interMotions:
-        #     frameTracks=0
-        #     frameLosses=0
-        #     currentPoseName=f
-        #     print(prevPoseName,currentPoseName)
-        #     for k in Landmarks.keys():
-        #         if(prevPoseName in Landmarks[k].frameTracks):
-        #             ########
-        #             ##check if it is still visible
-                    
-        #             ###
-        #             ##transform from first sighting into current coordinate frame
-        #             originalPoint=PointStamped()
-        #             originalPoint.point.x=Landmarks[k].X[0,0]
-        #             originalPoint.point.y=Landmarks[k].X[1,0]
-        #             originalPoint.point.z=Landmarks[k].X[2,0]
-        #             originalPoint.header.frame_id=Landmarks[k].frameTracks[0]
+            Rtheta=f[0]
+            C=f[1]
+            q=quaternion_from_euler(radians(Rtheta[0]),
+                    radians(Rtheta[1]),
+                    radians(Rtheta[2]),
+                    'szxy')  
+            latestPose=TransformStamped()
+            latestPose.transform.translation.x=C[0,0]
+            latestPose.transform.translation.y=C[1,0]
+            latestPose.transform.translation.z=C[2,0]
+            latestPose.transform.rotation.x=q[0]
+            latestPose.transform.rotation.y=q[1]
+            latestPose.transform.rotation.z=q[2]
+            latestPose.transform.rotation.w=q[3]
 
-        #             PotentialPoint=self.listener.transformPoint(currentPoseName,originalPoint)
-        #             ########################
-        #             ##project it onto the cameras
-        #             hX=np.ones((4,1))
-        #             hX[0,0]=PotentialPoint.point.x
-        #             hX[1,0]=PotentialPoint.point.y
-        #             hX[2,0]=PotentialPoint.point.z
-
-        #             L=self.kSettings["Pl"].dot(hX)
-        #             L/=L[2,0]
-        #             R=self.kSettings["Pr"].dot(hX)
-        #             R/=R[2,0]                    
-        #             ###if it is in front of the camera, and within the ROI, then it is valid
-        #             if(self.checkWithinROI(L) and self.checkWithinROI(R,False) and (hX[2,0]>0)):
-        #                 Landmarks[k].Ml.append(L)
-        #                 Landmarks[k].Mr.append(R)
-        #                 Landmarks[k].frameTracks.append(currentPoseName)
-        #                 frameTracks+=1
-        #             else:
-        #                 data=self.genLandmark()     
-        #                 newVertex=Landmark(currentPoseName,data[0],data[1],data[2])    
-        #                 Landmarks[str(count).zfill(7)]=newVertex
-        #                 count+=1
-        #                 frameLosses+=1
-        #     print(frameTracks,frameLosses,count)
-        print("Ready to begin publishing")
-
-        active=MarkerArray()
-        for k in Landmarks.keys():
-            newM=Marker()
-            newM.header.frame_id=Landmarks[k].frameTracks[0]
-            c=ChannelFloat32()
-            c.name="rgb"
-            c.values.append(255)
-            c.values.append(255)
-            c.values.append(0)
-
-            newM.type=2
-            newM.id=int(k)
-            newM.action=0
-            newM.pose.position.x=Landmarks[k].X[0,0]
-            newM.pose.position.y=Landmarks[k].X[1,0]
-            newM.pose.position.z=Landmarks[k].X[2,0]
-            newM.pose.orientation.x=0
-            newM.pose.orientation.y=0
-            newM.pose.orientation.z=0
-            newM.pose.orientation.w=1
-            newM.scale.x=0.1
-            newM.scale.y=0.1
-            newM.scale.z=0.1
-            newM.color.a=0.6
-            newM.color.b=1
-            active.markers.append(newM)
-        self.mapPub.publish(active)
-
-        print("map published")
-
-        for f in req.interMotions:
+            self.nodes[poseID]["msg"].transform=latestPose.transform
+         #tf2_ros.TransformListener(tfBuffer)
+        self.lSettings=getSimulatedLandmarkSettings()
 
 
-            a=simStereo()
-            a.frame=f
-            for k in Landmarks.keys():
-                if(f in Landmarks[k].frameTracks):
+    def simulate(self):
+        frames=self.getPoseVertices()
+        nTracks=400
+        print("generating new simulation")
+        for i in range(1,len(frames)):
+            self.publishPoses()
+            time.sleep(0.1)
+            frameTracks=0
+            currentPoseName=frames[i]
+            previousPoseName=frames[i-1]
+            added=0
+            evaluated=0
+            ##############
+            ##how many tracsk from current to Future?
+            for k in self.getLandmarkVertices():
+                PoseVertices=self.getLandmarkConnections(k)
+                if(previousPoseName in PoseVertices):
+                    #######
+                    ##get the edge, check it tracks from previous frame into current frame
+                    #####
+                    ###if it does, add it as an edge, increment number of tracks
+                    e=self.edges[previousPoseName,k]
+                    e["X"]
 
                     originalPoint=PointStamped()
-                    originalPoint.point.x=Landmarks[k].X[0,0]
-                    originalPoint.point.y=Landmarks[k].X[1,0]
-                    originalPoint.point.z=Landmarks[k].X[2,0]
-                    originalPoint.header.frame_id=Landmarks[k].frameTracks[0]
-                    currentPoint=self.listener.transformPoint(f,originalPoint)
-                    activeLandmark=simLandmark()
-                    activeLandmark.x=currentPoint.point.x
-                    activeLandmark.y=currentPoint.point.y
-                    activeLandmark.z=currentPoint.point.z
-                    activeLandmark.ID=k
-                    a.Active.append(activeLandmark)
-            print("totalLandmarks",len(a.Active),f)
-            self.pub.publish(a)
-            time.sleep(1)
-        return idealSimulationResponse()
-
-
-
-
-    def genLandmark(self,startIndex):
-        Ans=None
-        while(Ans is None):
-            possible=Landmark
-
-            Xa=genRandomCoordinate(self.lSettings["Xdepth"],
-                                    self.lSettings["Ydepth"],
-                                    self.lSettings["Zdepth"])    
-            La,Ra=self.kSettings["Pl"].dot(Xa),self.kSettings["Pr"].dot(Xa)
-            La/=La[2,0]
-            Ra/=Ra[2,0]
-            possible=Landmark(startIndex[0],Xa,La,Ra)
-
-            originalPoint=PointStamped()
-            originalPoint.point.x=Xa[0,0]
-            originalPoint.point.y=Xa[1,0]
-            originalPoint.point.z=Xa[2,0]
-            originalPoint.header.frame_id=startIndex[0]
-            framesTracked=0
-            tracked=True
-            if(self.checkWithinROI(La)
-                and self.checkWithinROI(Ra,False)
-                and (Xa[1,0]<self.lSettings["HeightMaximum"])
-                and (Xa[2,0]>0)):
-                while(framesTracked<(len(startIndex)-1)  and (tracked)):
-                    PotentialPoint=self.listener.transformPoint(startIndex[framesTracked+1],originalPoint)
-                    
+                    originalPoint.header.stamp=rospy.Time(0)
+                    originalPoint.point.x=e["X"][0,0]
+                    originalPoint.point.y=e["X"][1,0]
+                    originalPoint.point.z=e["X"][2,0]
+                    originalPoint.header.frame_id=self.displayName+"/"+previousPoseName
+                    PotentialPoint=self.listener.transformPoint(self.displayName+"/"+currentPoseName,originalPoint)
                     Xb=np.ones((4,1))
                     Xb[0,0]=PotentialPoint.point.x
                     Xb[1,0]=PotentialPoint.point.y
@@ -396,48 +210,209 @@ class stereo_simulator_node:
                             and (Xb[1,0]<self.lSettings["HeightMaximum"])
                             and (Xb[2,0]>0))
                     if(tracked):
-                        
-                        possible.frameTracks.append(startIndex[framesTracked+1])
-                        possible.Ml.append(Lb)
-                        possible.Mr.append(Rb)
-                        framesTracked+=1
-            if(framesTracked>0):
-                Ans=possible
+                        frameTracks+=1
+                        Mb=np.zeros((4,1))
+                        Mb[0,0]=Lb[0,0]
+                        Mb[1,0]=Lb[1,0]
+                        Mb[2,0]=Rb[0,0]
+                        Mb[3,0]=Rb[1,0]
 
-            # ##transform from first sighting into current coordinate frame
-            # originalPoint=PointStamped()
-            # originalPoint.point.x=Xa[0,0]
-            # originalPoint.point.y=Xa[1,0]
-            # originalPoint.point.z=Xa[2,0]
-            # originalPoint.header.frame_id=startIndex[0]
+                        self.add_edge(currentPoseName,k,X=Xb,M=Mb)
 
-            # PotentialPoint=self.listener.transformPoint(startIndex[1],originalPoint)
-                
-            # Xb=np.ones((4,1))
-            # Xb[0,0]=PotentialPoint.point.x
-            # Xb[1,0]=PotentialPoint.point.y
-            # Xb[2,0]=PotentialPoint.point.z
+            #######
+            ##for each landmark lost, generate a new one from previous to current
+            for Extra in range(nTracks-frameTracks):
+                self.genLandmark(previousPoseName,currentPoseName)
+                added+=1
+            print(previousPoseName,currentPoseName,added,frameTracks)
+            self.publishCurrentPose()
+            #self.svdRANSAC(previousPoseName,currentPoseName)
+            #self.publishGlobalPoints()
+            #self.publishLocalPoints(currentPoseName)
+            # img=np.zeros((768,1024,3))
 
-            # Lb,Rb=self.kSettings["Pl"].dot(Xb),self.kSettings["Pr"].dot(Xb)
-            # Lb/=Lb[2,0]
-            # Rb/=Rb[2,0]
-            # ################
-            # ###does it met the requirements for pose A
-            # if(self.checkWithinROI(La)
-            #     and self.checkWithinROI(Ra,False)
-            #     and (Xa[1,0]<self.lSettings["HeightMaximum"])
-            #     and (Xa[2,0]>0)):
-            #         if(self.checkWithinROI(Lb)
-            #             and self.checkWithinROI(Rb,False)
-            #             and (Xb[1,0]<self.lSettings["HeightMaximum"])
-            #             and (Xb[2,0]>0)):    
-            #                 Ans=Xa,La,Ra
-        return Ans    
+            # for k in self.getLandmarkVertices():
+            #     self.plotLandmark(img,k,[previousPoseName,currentPoseName])
+            # cv2.imshow("a",img)
+            # cv2.waitKey(1)
+
+
+        # feed=[]  
+        print(len(self.getLandmarkVertices())  )
+        print(len(self.getPoseVertices())  )
+        print(len(self.nodes()))#
+        print(len(self.edges()))
+
+        # for k in self.getLandmarkVertices():
+        #     #print(k)
+        #     feed.append(len(self.getLandmarkConnections(k)))
+        # plt.hist(feed,14)
+        # plt.show()   
+    def genLandmark(self,current,future,sourceName="ideal"):
+        Ans=None
+        while(Ans is None):
+            Xa=genRandomCoordinate(self.lSettings["Xdepth"],
+                                    self.lSettings["Ydepth"],
+                                    self.lSettings["Zdepth"])    
+            La,Ra=self.kSettings["Pl"].dot(Xa),self.kSettings["Pr"].dot(Xa)
+            La/=La[2,0]
+            Ra/=Ra[2,0]
+            originalPoint=PointStamped()
+            originalPoint.header.stamp=rospy.Time(0)
+            originalPoint.point.x=Xa[0,0]
+            originalPoint.point.y=Xa[1,0]
+            originalPoint.point.z=Xa[2,0]
+            originalPoint.header.frame_id=self.displayName+"/"+current
+            framesTracked=0
+            if(self.checkWithinROI(La)
+                and self.checkWithinROI(Ra,False)
+                and (Xa[1,0]<self.lSettings["HeightMaximum"])
+                and (Xa[2,0]>0)):
+                PotentialPoint=self.listener.transformPoint(self.displayName+"/"+future,originalPoint)
+                Xb=np.ones((4,1))
+                Xb[0,0]=PotentialPoint.point.x
+                Xb[1,0]=PotentialPoint.point.y
+                Xb[2,0]=PotentialPoint.point.z
+
+                Lb,Rb=self.kSettings["Pl"].dot(Xb),self.kSettings["Pr"].dot(Xb)
+                Lb/=Lb[2,0]
+                Rb/=Rb[2,0]
+
+                tracked=(self.checkWithinROI(Lb)and self.checkWithinROI(Rb,False)
+                        and (Xb[1,0]<self.lSettings["HeightMaximum"])
+                        and (Xb[2,0]>0))
+                if(tracked):
+                    #################
+                    #################
+                    newID=self.newLandmarkVertex()
+                    M=np.zeros((4,1))
+                    M[0,0]=La[0,0]
+                    M[1,0]=La[1,0]
+                    M[2,0]=Ra[0,0]
+                    M[3,0]=Ra[1,0]
+                    self.add_edge(current,newID,X=Xa,M=M)
+
+                    Mb=np.zeros((4,1))
+                    Mb[0,0]=Lb[0,0]
+                    Mb[1,0]=Lb[1,0]
+                    Mb[2,0]=Rb[0,0]
+                    Mb[3,0]=Rb[1,0]
+                    self.add_edge(future,newID,X=Xb,M=Mb)
+                    Ans=True 
     def checkWithinROI(self,pt,left=True):
         if(left):
             return ROIcheck(pt,ROIfrmMsg(self.kSettings["lInfo"].roi))
         else:
             return ROIcheck(pt,ROIfrmMsg(self.kSettings["rInfo"].roi))
+    def createSlidingGraph(self,dispName="graph"):
+        ans=slidingGraph(displayName=dispName,graph=self)
+
+        for a in ans.getPoseVertices():
+            previous=ans.nodes[a]["msg"].header.frame_id
+            if(previous!="world"):
+                ans.nodes[a]["msg"].header.frame_id=ans.displayName+previous[previous.rfind('/'):]
+            current=ans.nodes[a]["msg"].child_frame_id
+            ans.nodes[a]["msg"].child_frame_id=ans.displayName+current[current.rfind('/'):]
+        return ans
+
+
+
+# class stereo_simulator_node:
+#     def __init__(self):
+#         self.lSettings=getSimulatedLandmarkSettings()
+#         self.kSettings=getCameraSettingsFromServer(cameraType="subROI")
+#         self.s=rospy.Service("/idealSimulation",idealSimulation,self.genSimulation)
+#         self.pub=rospy.Publisher("/simulatedStereo",simStereo,queue_size=10)
+#         self.mapPub=rospy.Publisher("/dataMap",MarkerArray,queue_size=10,latch=True)
+#         self.listener=TransformListener()
+#         self.Landmarks={}
+#     def genSimulation(self,req):
+#         Landmarks={}
+#         count=0     ###total landmarks created in simulation
+#         print("generating new simulation")
+#         for i in range(0,len(req.interMotions)-1):
+#             frameTracks=0
+#             currentPoseName=req.interMotions[i]
+#             futurePoseName=req.interMotions[i+1]
+#             added=0
+#             print(currentPoseName,futurePoseName)
+#             while(frameTracks<req.nTracks):
+#                 frameTracks=0
+#                 ##############
+#                 ##how many tracsk from current to Future?
+#                 for k in Landmarks.keys():
+#                     if((currentPoseName in Landmarks[k].frameTracks)
+#                         and (futurePoseName in Landmarks[k].frameTracks)):
+#                             frameTracks+=1
+#                 for Extra in range(req.nTracks-frameTracks):
+#                     newVertex=self.genLandmark(req.interMotions[i:])    
+#                     Landmarks[str(count).zfill(7)]=newVertex
+#                     count+=1 
+#                     added+=1
+#             print(added,count,frameTracks)
+
+
+#         print("Ready to begin publishing")
+
+#         active=MarkerArray()
+#         for k in Landmarks.keys():
+#             newM=Marker()
+#             newM.header.frame_id=Landmarks[k].frameTracks[0]
+#             c=ChannelFloat32()
+#             c.name="rgb"
+#             c.values.append(255)
+#             c.values.append(255)
+#             c.values.append(0)
+
+#             newM.type=2
+#             newM.id=int(k)
+#             newM.action=0
+#             newM.pose.position.x=Landmarks[k].X[0,0]
+#             newM.pose.position.y=Landmarks[k].X[1,0]
+#             newM.pose.position.z=Landmarks[k].X[2,0]
+#             newM.pose.orientation.x=0
+#             newM.pose.orientation.y=0
+#             newM.pose.orientation.z=0
+#             newM.pose.orientation.w=1
+#             newM.scale.x=0.1
+#             newM.scale.y=0.1
+#             newM.scale.z=0.1
+#             newM.color.a=0.6
+#             newM.color.b=1
+#             active.markers.append(newM)
+#         self.mapPub.publish(active)
+
+#         print("map published")
+
+#         for f in req.interMotions:
+
+
+#             a=simStereo()
+#             a.frame=f
+#             for k in Landmarks.keys():
+#                 if(f in Landmarks[k].frameTracks):
+
+#                     originalPoint=PointStamped()
+#                     originalPoint.point.x=Landmarks[k].X[0,0]
+#                     originalPoint.point.y=Landmarks[k].X[1,0]
+#                     originalPoint.point.z=Landmarks[k].X[2,0]
+#                     originalPoint.header.frame_id=Landmarks[k].frameTracks[0]
+#                     currentPoint=self.listener.transformPoint(f,originalPoint)
+#                     activeLandmark=simLandmark()
+#                     activeLandmark.x=currentPoint.point.x
+#                     activeLandmark.y=currentPoint.point.y
+#                     activeLandmark.z=currentPoint.point.z
+#                     activeLandmark.ID=k
+#                     a.Active.append(activeLandmark)
+#             print("totalLandmarks",len(a.Active),f)
+#             self.pub.publish(a)
+#             time.sleep(1)
+#         return idealSimulationResponse()
+
+
+
+
+
 
 
 
@@ -514,28 +489,6 @@ class idealSimulator:
                         self.count+=1
                         frameLosses+=1
             print(frameTracks,frameLosses,self.count)
-
-
-                # try:
-
-                #     (trans,rot) = listener.lookupTransform(currentPoseName,prevPoseName,rospy.Time(0.0))
-                #     print(trans,rot)
-
-                #     R=quaternion_matrix(rot)
-
-                #     R[0,3]=trans[0]
-                #     R[1,3]=trans[1]
-                #     R[2,3]=trans[2]
-                #     print(R)
-                #     print(R.dot(testPoint))
-                #     print(listener.transformPoint(currentPoseName,test).point)
-                #     valid=True
-
-                    
-                #     #print(test.point,listener.transformPoint(currentPoseName,test).point)
-                # except Exception as e:
-                #     print(e)
-                #     time.sleep(0.2)
             prevPoseName=currentPoseName
     def publishLandmarks(self):
         

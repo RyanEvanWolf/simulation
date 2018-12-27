@@ -1,13 +1,39 @@
 #!/usr/bin/env python
 
 import rospy
+from bumblebee.baseTypes import slidingGraph
+#from bumblebee.stereo import getCameraSettingsFromServer,ROIfrmMsg
 from simulation.dataset import stereo_simulator_node
-
+import time
+import copy 
 
 rospy.init_node("ideal_simulation_node")
 
 
+
 bumble=stereo_simulator_node()
+time.sleep(1.5)
+
+bumble.simulate()
+
+abcd=bumble.createSlidingGraph()
+
+print("Copied")
 
 
+print(len(abcd.nodes()),len(abcd.edges()))
+
+totalPoses=abcd.getPoseVertices()
+print("analysis-----------------------")
+for p in range(0,len(totalPoses)-1):
+    currentPose,previousPose=totalPoses[p+1],totalPoses[p]
+    original=bumble.node[currentPose]["msg"]
+    newM=abcd.svdRANSAC(previousPose,currentPose)
+
+abcd.publishPoses()
+time.sleep(0.1)
+bumble.publishCurrentPose()
+# abcd.publishLocalPoints(totalPoses[-1])
+# abcd.publishGlobalPoints()
+abcd.publishCurrentPose()
 rospy.spin()

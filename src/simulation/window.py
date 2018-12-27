@@ -32,21 +32,21 @@ def rigid_transform_3D(previousLandmarks, currentLandmarks):
 
     return R,t
 
-class svdWindow:
-    def __init__(self):
-        ####
-        self.kSettings=getCameraSettingsFromServer(cameraType="subROI")
-        self.Landmarks={}
-        self.current=None
-        self.previous=None
-    def extractMotion(self,nMaxIterations=150,terminateRMS=0.2,)
+# class svdWindow:
+#     def __init__(self):
+#         ####
+#         self.kSettings=getCameraSettingsFromServer(cameraType="subROI")
+#         self.Landmarks={}
+#         self.current=None
+#         self.previous=None
+#     def extractMotion(self,nMaxIterations=150,terminateRMS=0.2,)
 
 
 
-def svdExtraction(previousX,currentX,Pl,Pr):
-    maxIt=150
-    minParam=3
-    go
+# def svdExtraction(previousX,currentX,Pl,Pr):
+#     maxIt=150
+#     minParam=3
+#     go
 
 
 class simpleWindow:
