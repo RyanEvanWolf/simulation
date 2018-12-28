@@ -16,7 +16,7 @@ from geometry_msgs.msg import Pose,TransformStamped
 import msgpack
 
 from bumblebee.utils import createDir
-from bumblebee.baseTypes import slidingGraph
+from bumblebee.baseTypes import slidingGraph,randomPartition
 import networkx as nx
 
 
@@ -124,17 +124,13 @@ class simPlayBack:
     #         i.header.stamp=rospy.Time.now()
     #         self.br.sendTransformMessage(i)
 
-
-
-
-
 class stereo_simulator_node(slidingGraph):
     def __init__(self):
         super(stereo_simulator_node,self).__init__(displayName="simulation")
        # self.listener = tf2_ros.Buffer()
 
         self.mset=MotionCategorySettings()
-        totalSeconds=5
+        totalSeconds=30
 
         fps=1/15.0
 
@@ -168,7 +164,7 @@ class stereo_simulator_node(slidingGraph):
 
     def simulate(self):
         frames=self.getPoseVertices()
-        nTracks=400
+        self.nTracks=100
         print("generating new simulation")
         for i in range(1,len(frames)):
             self.publishPoses()
@@ -221,14 +217,12 @@ class stereo_simulator_node(slidingGraph):
 
             #######
             ##for each landmark lost, generate a new one from previous to current
-            for Extra in range(nTracks-frameTracks):
+            for Extra in range(self.nTracks-frameTracks):
                 self.genLandmark(previousPoseName,currentPoseName)
                 added+=1
             print(previousPoseName,currentPoseName,added,frameTracks)
             self.publishCurrentPose()
-            #self.svdRANSAC(previousPoseName,currentPoseName)
-            #self.publishGlobalPoints()
-            #self.publishLocalPoints(currentPoseName)
+
             # img=np.zeros((768,1024,3))
 
             # for k in self.getLandmarkVertices():
@@ -237,17 +231,12 @@ class stereo_simulator_node(slidingGraph):
             # cv2.waitKey(1)
 
 
-        # feed=[]  
         print(len(self.getLandmarkVertices())  )
         print(len(self.getPoseVertices())  )
         print(len(self.nodes()))#
         print(len(self.edges()))
 
-        # for k in self.getLandmarkVertices():
-        #     #print(k)
-        #     feed.append(len(self.getLandmarkConnections(k)))
-        # plt.hist(feed,14)
-        # plt.show()   
+ 
     def genLandmark(self,current,future,sourceName="ideal"):
         Ans=None
         while(Ans is None):
@@ -299,6 +288,35 @@ class stereo_simulator_node(slidingGraph):
                     Mb[3,0]=Rb[1,0]
                     self.add_edge(future,newID,X=Xb,M=Mb)
                     Ans=True 
+    def genStereoLandmark(self):
+        valid=False
+        while(not valid):
+
+            lu=np.random.uniform(self.roiX,self.roiX+self.roiW)
+            lv=np.random.uniform(self.roiY,self.roiY+self.roiH)
+            ru=np.random.uniform(self.roiX,self.roiX+self.roiW)
+            rv=lv
+
+            dispVect=np.ones((4,1),dtype=np.float64)
+            disparity=lu-ru#-M[2,0]#lFeat.pt[0]-rFeat.pt[0]
+            dispVect[0,0]=lu#lFeat.pt[0]
+            dispVect[1,0]=lv#lFeat.pt[1]
+            dispVect[2,0]=disparity
+            xPred=self.kSettings['Q'].dot(dispVect)
+            xPred/=xPred[3,0]
+
+            La,Ra=self.kSettings["Pl"].dot(xPred),self.kSettings["Pr"].dot(xPred)
+            La/=La[2,0]
+            Ra/=Ra[2,0]       
+            if(xPred[2,0]>0):
+                valid=True
+        M=np.zeros((4,1))
+        M[0,0]=lu
+        M[1,0]=lv
+        M[2,0]=ru
+        M[3,0]=rv
+
+        return M,xPred
     def checkWithinROI(self,pt,left=True):
         if(left):
             return ROIcheck(pt,ROIfrmMsg(self.kSettings["lInfo"].roi))
@@ -314,106 +332,47 @@ class stereo_simulator_node(slidingGraph):
             current=ans.nodes[a]["msg"].child_frame_id
             ans.nodes[a]["msg"].child_frame_id=ans.displayName+current[current.rfind('/'):]
         return ans
+    def createOutlierSlidingGraph(self,percentOutlier=0.2,dispName="outlier"):
+        ans=self.createSlidingGraph(dispName=dispName)
+        setPoses=ans.getPoseVertices()
+
+        nOutliers=int(percentOutlier*self.nTracks)
+
+        for k in ans.edges():
+            ans.edges[k]["outlier"]=0
+
+        for p in range(1,len(setPoses)):
 
 
 
-# class stereo_simulator_node:
-#     def __init__(self):
-#         self.lSettings=getSimulatedLandmarkSettings()
-#         self.kSettings=getCameraSettingsFromServer(cameraType="subROI")
-#         self.s=rospy.Service("/idealSimulation",idealSimulation,self.genSimulation)
-#         self.pub=rospy.Publisher("/simulatedStereo",simStereo,queue_size=10)
-#         self.mapPub=rospy.Publisher("/dataMap",MarkerArray,queue_size=10,latch=True)
-#         self.listener=TransformListener()
-#         self.Landmarks={}
-#     def genSimulation(self,req):
-#         Landmarks={}
-#         count=0     ###total landmarks created in simulation
-#         print("generating new simulation")
-#         for i in range(0,len(req.interMotions)-1):
-#             frameTracks=0
-#             currentPoseName=req.interMotions[i]
-#             futurePoseName=req.interMotions[i+1]
-#             added=0
-#             print(currentPoseName,futurePoseName)
-#             while(frameTracks<req.nTracks):
-#                 frameTracks=0
-#                 ##############
-#                 ##how many tracsk from current to Future?
-#                 for k in Landmarks.keys():
-#                     if((currentPoseName in Landmarks[k].frameTracks)
-#                         and (futurePoseName in Landmarks[k].frameTracks)):
-#                             frameTracks+=1
-#                 for Extra in range(req.nTracks-frameTracks):
-#                     newVertex=self.genLandmark(req.interMotions[i:])    
-#                     Landmarks[str(count).zfill(7)]=newVertex
-#                     count+=1 
-#                     added+=1
-#             print(added,count,frameTracks)
+            previousPose=setPoses[p-1]
+            currentPose=setPoses[p]
+            activeTracks=ans.getLandmarkTracksAT(previousPose,currentPose)
 
 
-#         print("Ready to begin publishing")
-
-#         active=MarkerArray()
-#         for k in Landmarks.keys():
-#             newM=Marker()
-#             newM.header.frame_id=Landmarks[k].frameTracks[0]
-#             c=ChannelFloat32()
-#             c.name="rgb"
-#             c.values.append(255)
-#             c.values.append(255)
-#             c.values.append(0)
-
-#             newM.type=2
-#             newM.id=int(k)
-#             newM.action=0
-#             newM.pose.position.x=Landmarks[k].X[0,0]
-#             newM.pose.position.y=Landmarks[k].X[1,0]
-#             newM.pose.position.z=Landmarks[k].X[2,0]
-#             newM.pose.orientation.x=0
-#             newM.pose.orientation.y=0
-#             newM.pose.orientation.z=0
-#             newM.pose.orientation.w=1
-#             newM.scale.x=0.1
-#             newM.scale.y=0.1
-#             newM.scale.z=0.1
-#             newM.color.a=0.6
-#             newM.color.b=1
-#             active.markers.append(newM)
-#         self.mapPub.publish(active)
-
-#         print("map published")
-
-#         for f in req.interMotions:
-
-
-#             a=simStereo()
-#             a.frame=f
-#             for k in Landmarks.keys():
-#                 if(f in Landmarks[k].frameTracks):
-
-#                     originalPoint=PointStamped()
-#                     originalPoint.point.x=Landmarks[k].X[0,0]
-#                     originalPoint.point.y=Landmarks[k].X[1,0]
-#                     originalPoint.point.z=Landmarks[k].X[2,0]
-#                     originalPoint.header.frame_id=Landmarks[k].frameTracks[0]
-#                     currentPoint=self.listener.transformPoint(f,originalPoint)
-#                     activeLandmark=simLandmark()
-#                     activeLandmark.x=currentPoint.point.x
-#                     activeLandmark.y=currentPoint.point.y
-#                     activeLandmark.z=currentPoint.point.z
-#                     activeLandmark.ID=k
-#                     a.Active.append(activeLandmark)
-#             print("totalLandmarks",len(a.Active),f)
-#             self.pub.publish(a)
-#             time.sleep(1)
-#         return idealSimulationResponse()
-
-
-
-
-
-
+            outlierCount=0
+            setOutliers=[]
+            print("CHECKING",previousPose,currentPose)
+            for k in activeTracks:
+                if(ans.edges[previousPose,k]["outlier"]==1):
+                    outlierCount+=1
+                    setOutliers.append(k)
+            while(outlierCount<nOutliers):
+                trackIndexes=range(len(activeTracks))
+                np.random.shuffle(trackIndexes)
+                potentialOutlier=activeTracks[trackIndexes[0]]
+                if(ans.edges[previousPose,potentialOutlier]["outlier"]==0):
+                    
+                    edgeUpdateList=ans.getLandmarkConnections(potentialOutlier)
+                    for e in edgeUpdateList[edgeUpdateList.index(currentPose):]:
+                        ans.edges[e,potentialOutlier]["outlier"]=1
+                        out=self.genStereoLandmark()
+                        ans.edges[e,potentialOutlier]["M"]=out[0]
+                        ans.edges[e,potentialOutlier]["X"]=out[1]
+                    outlierCount+=1
+            print(setOutliers)
+        print("OUTLIERS PER FRAME",nOutliers)
+        return ans
 
 
 class idealSimulator:

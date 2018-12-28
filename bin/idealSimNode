@@ -6,7 +6,7 @@ from bumblebee.baseTypes import slidingGraph
 from simulation.dataset import stereo_simulator_node
 import time
 import copy 
-
+from std_msgs.msg import ColorRGBA
 rospy.init_node("ideal_simulation_node")
 
 
@@ -14,14 +14,12 @@ rospy.init_node("ideal_simulation_node")
 bumble=stereo_simulator_node()
 time.sleep(1.5)
 
+
+
+
 bumble.simulate()
-
-abcd=bumble.createSlidingGraph()
-
-print("Copied")
-
-
-print(len(abcd.nodes()),len(abcd.edges()))
+bumble.publishGlobalPoints()
+abcd=bumble.createOutlierSlidingGraph(0.05)
 
 totalPoses=abcd.getPoseVertices()
 print("analysis-----------------------")
@@ -32,8 +30,13 @@ for p in range(0,len(totalPoses)-1):
 
 abcd.publishPoses()
 time.sleep(0.1)
-bumble.publishCurrentPose()
-# abcd.publishLocalPoints(totalPoses[-1])
-# abcd.publishGlobalPoints()
-abcd.publishCurrentPose()
+
+
+abcd.playbackPoses()
+
+
+
+abcd.publishGlobalPoints(ColorRGBA(1,0,0,0.5))
+
+print("completed")
 rospy.spin()
