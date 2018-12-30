@@ -1,42 +1,224 @@
 #!/usr/bin/env python
 
 import rospy
-from bumblebee.baseTypes import slidingGraph
-#from bumblebee.stereo import getCameraSettingsFromServer,ROIfrmMsg
+from bumblebee.baseTypes import basicGraph
 from simulation.dataset import stereo_simulator_node
 import time
 import copy 
 from std_msgs.msg import ColorRGBA
-rospy.init_node("ideal_simulation_node")
+import matplotlib.pyplot as plt
+import matplotlib.style as sty
+sty.use("seaborn")
+import numpy as np
+import pickle 
 
+import networkx as nx
+
+rospy.init_node("ideal_simulation_node")
 
 
 bumble=stereo_simulator_node()
 time.sleep(1.5)
 
-
+bumble.nTracks=200
 
 
 bumble.simulate()
-bumble.publishGlobalPoints()
-abcd=bumble.createOutlierSlidingGraph(0.05)
 
-totalPoses=abcd.getPoseVertices()
+
+
+bumble.publishPoses()
+
+bumble.publishGlobalPoints()
+
+fig,(ax1,ax2,ax3)=plt.subplots(nrows=1, ncols=3)#,sharex=True,squeeze=True)
+fig2,(ax4,ax5,ax6)=plt.subplots(nrows=1, ncols=3)
+
+setAxis=(ax1,ax2,ax3,ax4,ax5,ax6)
+
+
+
+guassianOnes=bumble.createGaussianSlidingGraph(0.05)
+guassianOnes.displayName="g005"
+guassian2=bumble.createGaussianSlidingGraph(0.1)
+guassian2.displayName="g010"
+
+guassian4=bumble.createGaussianSlidingGraph(0.3)
+guassian4.displayName="g030"
+
+totalPoses=bumble.G.getPoseVertices()
 print("analysis-----------------------")
 for p in range(0,len(totalPoses)-1):
     currentPose,previousPose=totalPoses[p+1],totalPoses[p]
-    original=bumble.node[currentPose]["msg"]
-    newM=abcd.svdRANSAC(previousPose,currentPose)
+    guassianOnes.G.svdRANSAC(previousPose,currentPose)
+    guassian2.G.svdRANSAC(previousPose,currentPose)
+    guassian4.G.svdRANSAC(previousPose,currentPose)
 
-abcd.publishPoses()
+    # guassianOnes.publishInlierOutlierTracks(previousPose,currentPose)
+
+
+ideal=bumble.G.getDeltaMotion()
+ga=guassianOnes.G.getDeltaMotion()
+ga2=guassian2.G.getDeltaMotion()
+ga4=guassian4.G.getDeltaMotion()
+
+
+
+
+
+
+
+for i in range(len(ideal)):
+    #print(len(ideal[i]),len(ga[i]),len(ga2[i]),len(ga4[i]))
+   # setAxis[i].plot(ideal[i],'b',linewidth=5,label="ideal")
+    setAxis[i].plot(list(np.array(ideal[i])-np.array(ga[i])),linewidth=0.7,label="0.05")
+    setAxis[i].plot(list(np.array(ideal[i])-np.array(ga2[i])),linewidth=0.7,label="0.1")
+   #setAxis[i].plot(ideal[i]-ga4[i],linewidth=0.7,label="0.3")
+
+setAxis[0].legend()
+
+guassianOnes.publishPoses()
+
+guassian2.publishPoses()
+
+
+guassian4.publishPoses()
+bumble.publishPoses()
+
 time.sleep(0.1)
 
+fig,(a)=plt.subplots(nrows=1, ncols=1)#,sharex=True,squeeze=True)
 
-abcd.playbackPoses()
+cumulat=guassianOnes.getCumulativeError("simulation")
+
+
+for pp in cumulat:
+    a.plot(pp)
+
+plt.show()
+
+# ax1.plot(ga[0],'r','--',label="Gaussian0.1")
+# ax2.plot(ga[1],'r')
+# ax3.plot(ga[2],'r')
+# ax4.plot(ga[3],'r')
+# ax5.plot(ga[4],'r')
+# ax6.plot(ga[5],'r')
+
+
+# ax1.plot(ga2[0],'g','--',label="Gaussian0.2")
+# ax2.plot(ga2[1],'g')
+# ax3.plot(ga2[2],'g')
+# ax4.plot(ga2[3],'g')
+# ax5.plot(ga2[4],'g')
+# ax6.plot(ga2[5],'g')
+
+
+# ax1.plot(ga3[0],'r','--',label="Gaussian0.3")
+# ax2.plot(ga3[1],'r')
+# ax3.plot(ga3[2],'r')
+# ax4.plot(ga3[3],'r')
+# ax5.plot(ga3[4],'r')
+# ax6.plot(ga3[5],'r')
+
+
+# ax1.plot(ga4[0],'r','--',label="Gaussian0.5")
+# ax2.plot(ga4[1],'r')
+# ax3.plot(ga4[2],'r')
+# ax4.plot(ga4[3],'r')
+# ax5.plot(ga4[4],'r')
+# ax6.plot(ga4[5],'r')
 
 
 
-abcd.publishGlobalPoints(ColorRGBA(1,0,0,0.5))
+# ax1.plot(ideal[0],'b',label="ideal")
+# ax2.plot(ideal[1],'b')
+# ax3.plot(ideal[2],'b')
+# ax4.plot(ideal[3],'b')
+# ax5.plot(ideal[4],'b')
+# ax6.plot(ideal[5],'b')
 
-print("completed")
+
+
+
+# ax1.legend()
+
+
+
+
+# plt.show()
+
+# idR=[]
+# idC=[]
+
+# gaC=[]
+# gaR=[]
+
+# for a in range(0,len(totalPoses)-1):
+
+
+    # print(a)
+    # thet=np.sqrt(a[0][0]**2+a[0][1]**2+a[0][2]**2)
+    # C=np.sqrt((np.array(a[1])**2).sum())
+
+    # idR.append(thet)
+    # idC.append(C)
+
+# for a in ga:
+#     thet=np.sqrt((np.array(ga[0])**2).sum())
+#     C=np.sqrt((np.array(ga[1])**2).sum())
+
+#     gaR.append(thet)
+#     gaC.append(C)
+
+# fig,(ax1,ax2)=plt.subplots(nrows=2, ncols=1,sharex=True,squeeze=True)
+# ax1.plot(ideal[0],label="Ideal")
+# ax1.plot(ga[0],label="0.1")
+# # ax1.plot(Cy,label="Y")
+# # ax1.plot(Cz,label="Z")
+# ax1.legend()
+# ax2.plot(ideal[1],label="Ideal")
+# ax2.plot(ga[1],label="0.1")
+# # ax2.plot(pitch,label="pitch")
+# # ax2.plot(yaw,label="yaw")
+# ax2.legend()
+
+
+# plt.show()
+
+
+
+# fig,(ax1)=plt.subplots(nrows=1, ncols=1)
+# ax1.plot(abcd.node[totalPoses[-1]]["inlierRMS"])
+# ax1.plot(abcd.node[totalPoses[-2]]["inlierRMS"])
+# ax1.plot(abcd.node[totalPoses[-3]]["inlierRMS"])
+# bumble.graphTrueDelta()
+# abcd.graphDeltaMotion()
+
+
+# abcd.publishPoses()
+# abcd.publishGlobalPoints(ColorRGBA(1,0,0,0.5))
+# plt.show()
+
+
+
+
+# abcd=bumble.createOutlierSlidingGraph(0.35)
+
+# totalPoses=abcd.getPoseVertices()
+# print("analysis-----------------------")
+# for p in range(0,len(totalPoses)-1):
+#     currentPose,previousPose=totalPoses[p+1],totalPoses[p]
+#     original=bumble.node[currentPose]["msg"]
+#     newM=abcd.svdRANSAC(previousPose,currentPose)
+#     fig,(ax1)=plt.subplots(nrows=1, ncols=1)
+#     ax1.plot(abcd.node[currentPose]["inlierRMS"])
+#     abcd.publishInlierOutlierTracks(previousPose,currentPose)
+#     plt.show()
+
+
+
+
+
+
+
 rospy.spin()

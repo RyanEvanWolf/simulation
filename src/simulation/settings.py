@@ -12,21 +12,21 @@ def MotionCategorySettings():
 
     Settings["Medium"]["TranslationMean"]=0.044
     Settings["Medium"]["RotationMean"]=20
-    Settings["Medium"]["TranslationNoise"]=0.1*Settings["Medium"]["TranslationMean"] ##meters
+    Settings["Medium"]["TranslationNoise"]=0.5*Settings["Medium"]["TranslationMean"] ##meters
     Settings["Medium"]["RotationNoise"]=4        ##degrees
 
     Settings["Slow"]["TranslationMean"]=0.022
     Settings["Slow"]["RotationMean"]=10
-    Settings["Slow"]["TranslationNoise"]=0.1*Settings["Slow"]["TranslationMean"] ##meters
-    Settings["Slow"]["RotationNoise"]=1        ##degrees
+    Settings["Slow"]["TranslationNoise"]=0.5*Settings["Slow"]["TranslationMean"] ##meters
+    Settings["Slow"]["RotationNoise"]=3        ##degrees
     return Settings
 
 
 def getSimulatedLandmarkSettings():
     Settings={}
-    Settings["Xdepth"]=2
-    Settings["Ydepth"]=2
-    Settings["Zdepth"]=2
+    Settings["Xdepth"]=5
+    Settings["Ydepth"]=5
+    Settings["Zdepth"]=5
     Settings["HeightMaximum"]=0.5
     Settings["MinimumOutlier"]=4.0 #pixels
     Settings["OutlierLevels"]=[0.05,0.12,0.2]

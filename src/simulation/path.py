@@ -32,8 +32,8 @@ def MotionCategorySettings():
 
     Settings["Medium"]["TranslationMean"]=0.044
     Settings["Medium"]["RotationMean"]=5
-    Settings["Medium"]["TranslationNoise"]=0.1*Settings["Medium"]["TranslationMean"] ##meters
-    Settings["Medium"]["RotationNoise"]=0.2        ##degrees
+    Settings["Medium"]["TranslationNoise"]=0.3*Settings["Medium"]["TranslationMean"] ##meters
+    Settings["Medium"]["RotationNoise"]=2        ##degrees
 
     Settings["Slow"]["TranslationMean"]=0.022
     Settings["Slow"]["RotationMean"]=2
@@ -85,7 +85,7 @@ def genStraightTransform(mSettings,nFrames=2):
 def genTurningTransform(mSettings,nFrames=2):
     setTransforms=[]
     for i in range(0,nFrames-1):
-        C=forwardTranslation(mSettings["TranslationMean"]+0.3,mSettings["TranslationNoise"])
+        C=forwardTranslation(mSettings["TranslationMean"],mSettings["TranslationNoise"])
         Rtheta=dominantRotation(mSettings["RotationMean"],mSettings["RotationNoise"])
         setTransforms.append((Rtheta,C))
     return setTransforms  

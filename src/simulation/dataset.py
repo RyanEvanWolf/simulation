@@ -124,23 +124,41 @@ class simPlayBack:
     #         i.header.stamp=rospy.Time.now()
     #         self.br.sendTransformMessage(i)
 
+
+
 class stereo_simulator_node(slidingGraph):
-    def __init__(self):
+    def __init__(self,path="Straight"):
         super(stereo_simulator_node,self).__init__(displayName="simulation")
        # self.listener = tf2_ros.Buffer()
 
+
+
+
         self.mset=MotionCategorySettings()
-        totalSeconds=30
 
-        fps=1/15.0
+        if(path=="Straight"):
+            totalSeconds=4
 
-        nFrames=int(totalSeconds/fps)
+            fps=1/15.0
 
-        self.newPoseVertex()
-        motions=genStraightTransform(self.mset["Medium"],nFrames)
+            nFrames=int(totalSeconds/fps)
+
+            self.G.newPoseVertex()
+            motions=genStraightTransform(self.mset["Medium"],nFrames)
+        else:
+            motions=(genStraightTransform(self.mset["Medium"],3*15)+
+                    genTurningTransform(self.mset["Medium"],20)+genStraightTransform(self.mset["Medium"],3*15))
+        self.roll=[]
+        self.pitch=[]
+        self.yaw=[]
+
+        self.Tx=[]
+        self.Ty=[]
+        self.Tz=[]
+
 
         for f in motions:
-            poseID=self.newPoseVertex()
+            poseID=self.G.newPoseVertex()
             
             Rtheta=f[0]
             C=f[1]
@@ -157,18 +175,24 @@ class stereo_simulator_node(slidingGraph):
             latestPose.transform.rotation.z=q[2]
             latestPose.transform.rotation.w=q[3]
 
-            self.nodes[poseID]["msg"].transform=latestPose.transform
-         #tf2_ros.TransformListener(tfBuffer)
-        self.lSettings=getSimulatedLandmarkSettings()
+            self.roll.append(Rtheta[0])
+            self.pitch.append(Rtheta[1])
+            self.yaw.append(Rtheta[2])
 
+            self.Tx.append(C[0,0])
+            self.Ty.append(C[1,0])
+            self.Tz.append(C[2,0])
+
+            self.G.nodes[poseID]["msg"].transform=latestPose.transform
+        self.lSettings=getSimulatedLandmarkSettings()
+        self.nTracks=400
 
     def simulate(self):
-        frames=self.getPoseVertices()
-        self.nTracks=100
+        frames=self.G.getPoseVertices()
         print("generating new simulation")
+        self.publishPoses()
+        time.sleep(0.1)
         for i in range(1,len(frames)):
-            self.publishPoses()
-            time.sleep(0.1)
             frameTracks=0
             currentPoseName=frames[i]
             previousPoseName=frames[i-1]
@@ -176,14 +200,14 @@ class stereo_simulator_node(slidingGraph):
             evaluated=0
             ##############
             ##how many tracsk from current to Future?
-            for k in self.getLandmarkVertices():
-                PoseVertices=self.getLandmarkConnections(k)
+            for k in self.G.getLandmarkVertices():
+                PoseVertices=self.G.getLandmarkConnections(k)
                 if(previousPoseName in PoseVertices):
                     #######
                     ##get the edge, check it tracks from previous frame into current frame
                     #####
                     ###if it does, add it as an edge, increment number of tracks
-                    e=self.edges[previousPoseName,k]
+                    e=self.G.edges[previousPoseName,k]
                     e["X"]
 
                     originalPoint=PointStamped()
@@ -198,7 +222,7 @@ class stereo_simulator_node(slidingGraph):
                     Xb[1,0]=PotentialPoint.point.y
                     Xb[2,0]=PotentialPoint.point.z
 
-                    Lb,Rb=self.kSettings["Pl"].dot(Xb),self.kSettings["Pr"].dot(Xb)
+                    Lb,Rb=self.G.kSettings["Pl"].dot(Xb),self.G.kSettings["Pr"].dot(Xb)
                     Lb/=Lb[2,0]
                     Rb/=Rb[2,0]
 
@@ -213,7 +237,7 @@ class stereo_simulator_node(slidingGraph):
                         Mb[2,0]=Rb[0,0]
                         Mb[3,0]=Rb[1,0]
 
-                        self.add_edge(currentPoseName,k,X=Xb,M=Mb)
+                        self.G.add_edge(currentPoseName,k,X=Xb,M=Mb)
 
             #######
             ##for each landmark lost, generate a new one from previous to current
@@ -221,29 +245,14 @@ class stereo_simulator_node(slidingGraph):
                 self.genLandmark(previousPoseName,currentPoseName)
                 added+=1
             print(previousPoseName,currentPoseName,added,frameTracks)
-            self.publishCurrentPose()
 
-            # img=np.zeros((768,1024,3))
-
-            # for k in self.getLandmarkVertices():
-            #     self.plotLandmark(img,k,[previousPoseName,currentPoseName])
-            # cv2.imshow("a",img)
-            # cv2.waitKey(1)
-
-
-        print(len(self.getLandmarkVertices())  )
-        print(len(self.getPoseVertices())  )
-        print(len(self.nodes()))#
-        print(len(self.edges()))
-
- 
     def genLandmark(self,current,future,sourceName="ideal"):
         Ans=None
         while(Ans is None):
             Xa=genRandomCoordinate(self.lSettings["Xdepth"],
                                     self.lSettings["Ydepth"],
                                     self.lSettings["Zdepth"])    
-            La,Ra=self.kSettings["Pl"].dot(Xa),self.kSettings["Pr"].dot(Xa)
+            La,Ra=self.G.kSettings["Pl"].dot(Xa),self.G.kSettings["Pr"].dot(Xa)
             La/=La[2,0]
             Ra/=Ra[2,0]
             originalPoint=PointStamped()
@@ -263,7 +272,7 @@ class stereo_simulator_node(slidingGraph):
                 Xb[1,0]=PotentialPoint.point.y
                 Xb[2,0]=PotentialPoint.point.z
 
-                Lb,Rb=self.kSettings["Pl"].dot(Xb),self.kSettings["Pr"].dot(Xb)
+                Lb,Rb=self.G.kSettings["Pl"].dot(Xb),self.G.kSettings["Pr"].dot(Xb)
                 Lb/=Lb[2,0]
                 Rb/=Rb[2,0]
 
@@ -273,20 +282,20 @@ class stereo_simulator_node(slidingGraph):
                 if(tracked):
                     #################
                     #################
-                    newID=self.newLandmarkVertex()
+                    newID=self.G.newLandmarkVertex()
                     M=np.zeros((4,1))
                     M[0,0]=La[0,0]
                     M[1,0]=La[1,0]
                     M[2,0]=Ra[0,0]
                     M[3,0]=Ra[1,0]
-                    self.add_edge(current,newID,X=Xa,M=M)
+                    self.G.add_edge(current,newID,X=Xa,M=M)
 
                     Mb=np.zeros((4,1))
                     Mb[0,0]=Lb[0,0]
                     Mb[1,0]=Lb[1,0]
                     Mb[2,0]=Rb[0,0]
                     Mb[3,0]=Rb[1,0]
-                    self.add_edge(future,newID,X=Xb,M=Mb)
+                    self.G.add_edge(future,newID,X=Xb,M=Mb)
                     Ans=True 
     def genStereoLandmark(self):
         valid=False
@@ -302,10 +311,10 @@ class stereo_simulator_node(slidingGraph):
             dispVect[0,0]=lu#lFeat.pt[0]
             dispVect[1,0]=lv#lFeat.pt[1]
             dispVect[2,0]=disparity
-            xPred=self.kSettings['Q'].dot(dispVect)
+            xPred=self.G.kSettings['Q'].dot(dispVect)
             xPred/=xPred[3,0]
 
-            La,Ra=self.kSettings["Pl"].dot(xPred),self.kSettings["Pr"].dot(xPred)
+            La,Ra=self.G.kSettings["Pl"].dot(xPred),self.G.kSettings["Pr"].dot(xPred)
             La/=La[2,0]
             Ra/=Ra[2,0]       
             if(xPred[2,0]>0):
@@ -317,63 +326,112 @@ class stereo_simulator_node(slidingGraph):
         M[3,0]=rv
 
         return M,xPred
+    def addGaussianNoise(self,sigma,edge,outGraph):
+        valid=False
+        original=None
+        while(not valid):
+            original=copy.deepcopy(self.G.edges[edge])
+
+            outGraph.G.edges[edge]["M"][0,0]= original["M"][0,0]+np.random.normal(0,sigma,1)
+            outGraph.G.edges[edge]["M"][2,0]= original["M"][2,0]+np.random.normal(0,sigma,1)
+
+            dispVect=np.ones((4,1),dtype=np.float64)
+            disparity=outGraph.G.edges[edge]["M"][0,0]-outGraph.G.edges[edge]["M"][2,0]#-M[2,0]#lFeat.pt[0]-rFeat.pt[0]
+            dispVect[0,0]=outGraph.G.edges[edge]["M"][0,0]#lFeat.pt[0]
+            dispVect[1,0]=outGraph.G.edges[edge]["M"][1,0]#lFeat.pt[1]
+            dispVect[2,0]=disparity
+            xPred=self.G.kSettings['Q'].dot(dispVect)
+            xPred/=xPred[3,0]
+            outGraph.G.edges[edge]["X"]=xPred     
+            if(xPred[2,0]>0):
+                valid=True   
     def checkWithinROI(self,pt,left=True):
         if(left):
-            return ROIcheck(pt,ROIfrmMsg(self.kSettings["lInfo"].roi))
+            return ROIcheck(pt,ROIfrmMsg(self.G.kSettings["lInfo"].roi))
         else:
-            return ROIcheck(pt,ROIfrmMsg(self.kSettings["rInfo"].roi))
-    def createSlidingGraph(self,dispName="graph"):
-        ans=slidingGraph(displayName=dispName,graph=self)
+            return ROIcheck(pt,ROIfrmMsg(self.G.kSettings["rInfo"].roi))
+#     def createSlidingGraph(self,dispName="graph"):
+#         ans=slidingGraph(displayName=dispName,graph=self)
 
-        for a in ans.getPoseVertices():
-            previous=ans.nodes[a]["msg"].header.frame_id
-            if(previous!="world"):
-                ans.nodes[a]["msg"].header.frame_id=ans.displayName+previous[previous.rfind('/'):]
-            current=ans.nodes[a]["msg"].child_frame_id
-            ans.nodes[a]["msg"].child_frame_id=ans.displayName+current[current.rfind('/'):]
+#         for a in ans.getPoseVertices():
+#             previous=ans.nodes[a]["msg"].header.frame_id
+#             if(previous!="world"):
+#                 ans.nodes[a]["msg"].header.frame_id=ans.displayName+previous[previous.rfind('/'):]
+#             current=ans.nodes[a]["msg"].child_frame_id
+#             ans.nodes[a]["msg"].child_frame_id=ans.displayName+current[current.rfind('/'):]
+#         return ans
+    def createGaussianSlidingGraph(self,gaussianNoise=0.25,dispName="gaussian"):
+        ans=slidingGraph(displayName=dispName)
+        ans.G=copy.deepcopy(self.G)
+        setPoses=ans.G.getPoseVertices()
+        print("updating Gaussina Noise ")
+        for e in ans.G.edges():
+            self.addGaussianNoise(gaussianNoise,e,ans)
+            
+
+        # for n in ans.G.getPoseVertices():
+        #     print(ans.G.nodes[n]["msg"].header.frame_id)
+        #     print(ans.G.nodes[n]["msg"].child_frame_id)
+        #     print(ans.G.nodes[n]["msg"].header.frame_id)
+            # ans.G.nodes[n]["msg"].header.frame_id=ans.G.nodes[n]["msg"].header.frame_id[ans.G.nodes[n]["msg"].header.frame_id.rfind("/"):]
+            # print(ans.G.nodes[n]["msg"].header.frame_id)
+            # print(ans.G.nodes[n]["msg"].header.frame_id.rfind('/'))
+            # ans.G.edges[e]["msg"].header.frame_id
+            # ans.G.edges[e]["msg"].header.frame_id=ans.G.edges[e]["msg"].header.frame_id[:ans.G.edges[e]["msg"].header.frame_id.rfind('/')]
+            # ans.G.edges[e]["msg"].child_frame_id=ans.G.edges[e]["msg"].child_frame_id[:ans.G.edges[e]["msg"].child_frame_id.rfind('/')]
+        print("completed")
         return ans
-    def createOutlierSlidingGraph(self,percentOutlier=0.2,dispName="outlier"):
-        ans=self.createSlidingGraph(dispName=dispName)
-        setPoses=ans.getPoseVertices()
+    # def createOutlierSlidingGraph(self,percentOutlier=0.2,dispName="outlier"):
+    #     ans=slidingGraph(displayName=dispName)
+        
+    #     self.createSlidingGraph(dispName=dispName)
+    #     setPoses=ans.getPoseVertices()
 
-        nOutliers=int(percentOutlier*self.nTracks)
+    #     nOutliers=int(percentOutlier*self.nTracks)
 
-        for k in ans.edges():
-            ans.edges[k]["outlier"]=0
+    #     for k in ans.edges():
+    #         ans.edges[k]["outlier"]=0
 
-        for p in range(1,len(setPoses)):
-
-
-
-            previousPose=setPoses[p-1]
-            currentPose=setPoses[p]
-            activeTracks=ans.getLandmarkTracksAT(previousPose,currentPose)
+    #     for p in range(1,len(setPoses)):
 
 
-            outlierCount=0
-            setOutliers=[]
-            print("CHECKING",previousPose,currentPose)
-            for k in activeTracks:
-                if(ans.edges[previousPose,k]["outlier"]==1):
-                    outlierCount+=1
-                    setOutliers.append(k)
-            while(outlierCount<nOutliers):
-                trackIndexes=range(len(activeTracks))
-                np.random.shuffle(trackIndexes)
-                potentialOutlier=activeTracks[trackIndexes[0]]
-                if(ans.edges[previousPose,potentialOutlier]["outlier"]==0):
+
+#             previousPose=setPoses[p-1]
+#             currentPose=setPoses[p]
+#             activeTracks=ans.getLandmarkTracksAT(previousPose,currentPose)
+
+
+#             outlierCount=0
+#             setOutliers=[]
+#             for k in activeTracks:
+#                 if(ans.edges[previousPose,k]["outlier"]==1):
+#                     outlierCount+=1
+#                     setOutliers.append(k)
+#             while(outlierCount<nOutliers):
+#                 trackIndexes=range(len(activeTracks))
+#                 np.random.shuffle(trackIndexes)
+#                 potentialOutlier=activeTracks[trackIndexes[0]]
+#                 if(ans.edges[previousPose,potentialOutlier]["outlier"]==0):
                     
-                    edgeUpdateList=ans.getLandmarkConnections(potentialOutlier)
-                    for e in edgeUpdateList[edgeUpdateList.index(currentPose):]:
-                        ans.edges[e,potentialOutlier]["outlier"]=1
-                        out=self.genStereoLandmark()
-                        ans.edges[e,potentialOutlier]["M"]=out[0]
-                        ans.edges[e,potentialOutlier]["X"]=out[1]
-                    outlierCount+=1
-            print(setOutliers)
-        print("OUTLIERS PER FRAME",nOutliers)
-        return ans
-
+#                     edgeUpdateList=ans.getLandmarkConnections(potentialOutlier)
+#                     for e in edgeUpdateList[edgeUpdateList.index(currentPose):]:
+#                         ans.edges[e,potentialOutlier]["outlier"]=1
+#                         out=self.genStereoLandmark()
+#                         ans.edges[e,potentialOutlier]["M"]=out[0]
+#                         ans.edges[e,potentialOutlier]["X"]=out[1]
+#                     outlierCount+=1
+#         return ans
+    def graphTrueDelta(self):
+        fig,(ax1,ax2)=plt.subplots(nrows=2, ncols=1,sharex=True,squeeze=True)
+        fig.suptitle("TRUE_"+self.displayName)
+        ax1.plot(self.Tx,label="X")
+        ax1.plot(self.Ty,label="Y")
+        ax1.plot(self.Tz,label="Z")
+        ax1.legend()
+        ax2.plot(self.roll,label="roll")
+        ax2.plot(self.pitch,label="pitch")
+        ax2.plot(self.yaw,label="yaw")
+        ax2.legend()       
 
 class idealSimulator:
     def __init__(self,lSettings,kSettings,nTracks=10):
