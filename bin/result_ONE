@@ -1,0 +1,104 @@
+#!/usr/bin/env python
+
+
+
+
+from bumblebee.motion import *
+
+from simulation.path import *
+from simulation.settings import *
+import tf.transformations
+from geometry_msgs.msg import TransformStamped,Transform,Quaternion,Vector3
+from bumblebee.baseTypes import basicGraph
+from simulation.dataset import stereo_simulator_node
+import pickle
+import os
+import rospy
+
+import time
+import scipy.stats.mstats as stat
+from scipy.stats import norm,cauchy
+import matplotlib.pyplot as plt
+import matplotlib.style as sty
+sty.use("seaborn")
+
+
+
+rootFolder="/media/ryan/EXTRA/Simulation/200"
+
+setFiles=os.listdir(rootFolder)
+
+for f in setFiles:
+    allFiles=rootFolder+"/"+f
+    if(f[f.rindex("."):]==".simulation"):
+        with open(allFiles,"r") as fread:
+            idealData=pickle.load(fread)
+    print(f[f.rindex("."):])
+
+fig,(ax1,ax2,ax3)=plt.subplots(nrows=3, ncols=1)#,sharex=True,squeeze=True)
+fig2,(ax4,ax5,ax6)=plt.subplots(nrows=3, ncols=1)
+
+ax1.set_xlabel("Roll (degrees)")
+ax2.set_xlabel("Pitch (degrees)")
+ax3.set_xlabel("Yaw (degrees)")
+
+ax4.set_xlabel("X (m)")
+ax5.set_xlabel("Y (m)")
+ax6.set_xlabel("Z (m)")
+ax5.set_ylabel("Total $KF$")
+ax2.set_ylabel("Total $KF$")
+
+fig.suptitle("Orientation Error $T_{track}=200$")
+fig2.suptitle("Translation Error $T_{track}=200$")
+setAxis=(ax1,ax2,ax3,ax4,ax5,ax6)
+ideal=idealData.getDeltaMotion()
+
+gaussGraphs=[]
+gCOlor=[(1,0,0,0.2),(0,1,0,.2),(0,0,1,0.2),(0.5,0.5,0,0.2)]
+lineColor=[(1,0,0,.8),(0,1,0,.8),(0,0,1,0.8),(0.5,0.5,0,0.8)]
+gNames=["0.05","0.1","0.2","0.3"]
+for f in setFiles:
+    allFiles=rootFolder+"/"+f
+    if(f[f.rindex("."):]==".gauss"):
+        print(allFiles)
+        with open(allFiles,"r") as fread:
+            inData=pickle.load(fread)
+            gaussGraphs.append(inData.getDeltaMotion())
+
+
+
+for g in range(len(gaussGraphs)):
+    for i in range(6):
+        error=list(np.array(gaussGraphs[g][i])-np.array(ideal[i]))
+        setAxis[i].hist(error,color=gCOlor[g],bins=26,label=gNames[g])
+
+        fake=setAxis[i].twinx()
+        mu,sigma = cauchy.fit(error)
+        x_pdf = np.linspace(np.min(error),np.max(error), 100)
+        y_pdf=cauchy.pdf(x_pdf, mu, sigma)
+        
+        fake.plot(x_pdf,y_pdf,color=lineColor[g],linestyle='dashed')
+       # ax2.set_ylabel('Probability Density Function')
+        fake.grid(False)
+        fake.axis('off')
+        setAxis[i].legend()
+plt.show()
+
+# with open("/media/ryan/EXTRA/Simulation/data_100.simulation","r") as f:
+#     newData=pickle.load(f)
+# fig,(ax1,ax2,ax3)=plt.subplots(nrows=1, ncols=3)#,sharex=True,squeeze=True)
+# fig2,(ax4,ax5,ax6)=plt.subplots(nrows=1, ncols=3)
+
+# setAxis=(ax1,ax2,ax3,ax4,ax5,ax6)
+
+# d=newData.getDeltaMotion()
+
+
+# for i in range(len(gaussGraphs)):
+#     #print(len(ideal[i]),len(ga[i]),len(ga2[i]),len(ga4[i]))
+#     setAxis[i].plot(guassGraphs[i],linewidth=0.5)
+#   #  setAxis[i].plot(list(np.array(ideal[i])-np.array(ga[i])),linewidth=0.7,label="0.05")
+#   #  setAxis[i].plot(list(np.array(ideal[i])-np.array(ga2[i])),linewidth=0.7,label="0.1")
+#    #setAxis[i].plot(ideal[i]-ga4[i],linewidth=0.7,label="0.3")
+
+# plt.show()

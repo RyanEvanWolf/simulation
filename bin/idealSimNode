@@ -20,7 +20,7 @@ rospy.init_node("ideal_simulation_node")
 bumble=stereo_simulator_node()
 time.sleep(1.5)
 
-bumble.nTracks=200
+bumble.nTracks=15
 
 
 bumble.simulate()

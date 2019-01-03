@@ -1,47 +1,55 @@
 #!/usr/bin/env python
 
-
-# import math
-# import time
-
-# import pickle
-
-# import cv2
-# import numpy as np
-# import rospy
-# from cv_bridge import CvBridge
-
-# from dataset.simulation import *
-# from bumblebee.baseTypes import *
-# from bumblebee.stereo import stereoCamera
-# from bumblebee.utils import createDir
-# from bumblebee.drawing import *
-
-
-
-from bumblebee.motion import *
-
-from simulation.path import *
-from simulation.settings import *
-import tf.transformations
-from geometry_msgs.msg import TransformStamped,Transform,Quaternion,Vector3
-
 import rospy
-
+from bumblebee.baseTypes import basicGraph
+from simulation.dataset import stereo_simulator_node
 import time
-mset=MotionCategorySettings()
+import copy 
+from std_msgs.msg import ColorRGBA
+import matplotlib.pyplot as plt
+import matplotlib.style as sty
+sty.use("seaborn")
+import numpy as np
+import pickle 
+
+import networkx as nx
+
+rospy.init_node("ideal_simulation_node")
 
 
-rospy.init_node("motionDisplay")
+
+GaussianNoises=["0.05","0.1","0.2","0.3"]
+noise=[0.05,0.1,0.2,0.3]
+bumble=stereo_simulator_node("curve")
+bumble.publishPoses()
+print("begining in 3")
+time.sleep(1)
+print("begining in 2")
+time.sleep(1)
+print("begining in 1")
+time.sleep(1)
+
+bumble.nTracks=400
+
+nPoints=str(bumble.nTracks)
+
+bumble.simulate()
+
+print("Simulation Complete")
+print("Saving")
+
+outFolder="/media/ryan/EXTRA/Simulation/"+nPoints
+with open(outFolder+"/data.simulation",'wb') as f:
+    pickle.dump(bumble.G,f)
 
 
-motion=pureOdometry()
+for g in range(len(noise)):
+    simGauss=bumble.createGaussianSlidingGraph(GaussianNoises[g])
+    newFile=outFolder+"/G_"+GaussianNoises[g]+".gauss"
+    with open(newFile,'wb') as f:
+        pickle.dump(simGauss.G,f) 
+    print("written "+newFile)
 
-while(not rospy.is_shutdown()):
-    motion.publishPoses()
-    time.sleep(1)
 
 
-
-# motions=genStraightTransform(mset["Medium"],nFrames)
 

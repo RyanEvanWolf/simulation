@@ -9,19 +9,39 @@ from simulation.path import *
 from simulation.settings import *
 import tf.transformations
 from geometry_msgs.msg import TransformStamped,Transform,Quaternion,Vector3
-
+from bumblebee.baseTypes import basicGraph
+from simulation.dataset import stereo_simulator_node
 import pickle
 import os
 import rospy
 
 import time
 
+import matplotlib.pyplot as plt
+import matplotlib.style as sty
+sty.use("seaborn")
+
+
+
 rospy.init_node("display_path")
-disp=pathViewer()
-
-disp.loadFromFile("/media/ryan/EXTRA/Simulation/Motion")
 
 
+with open("/media/ryan/EXTRA/Simulation/data_50.simulation","r") as f:
+    newData=pickle.load(f)
+
+
+d=newData.getDeltaMotion()
+
+display=slidingGraph()
+display.G=newData
+
+display.publishPoses()
+time.sleep(1)
+print("Published")
 while(True):
-    disp.publish()
-    time.sleep(0.1)
+    display.publishPoses()
+    display.publishGlobalPoints()
+    display.publishLocalPoints(newData.getPoseVertices()[-1],delta=False)
+    time.sleep(0.5)
+
+rospy.spin()

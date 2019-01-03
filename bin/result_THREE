@@ -1,0 +1,81 @@
+#!/usr/bin/env python
+
+
+
+
+from bumblebee.motion import *
+
+from simulation.path import *
+from simulation.settings import *
+import tf.transformations
+from geometry_msgs.msg import TransformStamped,Transform,Quaternion,Vector3
+from bumblebee.baseTypes import basicGraph,slidingGraph
+from simulation.dataset import stereo_simulator_node
+import pickle
+import os
+import rospy
+
+import time
+import scipy.stats.mstats as stat
+from scipy.stats import norm,cauchy
+import matplotlib.pyplot as plt
+import matplotlib.style as sty
+from mpl_toolkits.mplot3d import Axes3D
+sty.use("seaborn")
+
+from tf import TransformListener,TransformBroadcaster
+from tf.transformations import *
+
+
+rospy.init_node("display_path")
+
+rootFolder="/media/ryan/EXTRA/Simulation"
+
+setFiles=os.listdir(rootFolder)
+
+
+idealGraph=None
+simGraph=[]
+fileName=[]
+listener =TransformListener() 
+for f in setFiles:
+    allFiles=rootFolder+"/"+f
+    print(allFiles)
+    with open(allFiles,"r") as fread:
+        print(allFiles)
+        if(f[f.rindex("."):]==".gauss"):
+        
+            with open(allFiles,"r") as fread:
+                simGraph.append(slidingGraph("g_"+str(len(simGraph))))
+                fileName.append(f)
+                simGraph[-1].G=pickle.load(fread)
+        else:
+            idealGraph=slidingGraph("ideal")
+            idealGraph.G=pickle.load(fread)
+
+
+idealGraph.publishPoses()
+idealGraph.publishGlobalPoints()
+for s in simGraph:
+    s.publishPoses()
+time.sleep(2)
+
+for j in simGraph:
+    finalPose=idealGraph.G.getPoseVertices()[-1]
+    msg=listener.lookupTransform("ideal"+"/"+finalPose,j.displayName+"/"+finalPose,rospy.Time(0))
+    
+    x=msg[0][0]
+    y=msg[0][1]
+    z=msg[0][2]
+
+    R=euler_from_quaternion(msg[1],'szxy')
+    r=degrees(R[0])
+    p=degrees(R[1])
+    y=degrees(R[2])
+
+    Tx=np.sqrt(x**2 +y**2 +z**2)
+    Rtheta=np.sqrt(r**2 +p**2+y**2)
+    print(j.displayName,Tx,Rtheta)
+print("finished")
+print(fileName)
+rospy.spin()

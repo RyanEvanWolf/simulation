@@ -31,9 +31,9 @@ def MotionCategorySettings():
     Settings["Fast"]["RotationNoise"]=5    ##degrees
 
     Settings["Medium"]["TranslationMean"]=0.044
-    Settings["Medium"]["RotationMean"]=5
+    Settings["Medium"]["RotationMean"]=15
     Settings["Medium"]["TranslationNoise"]=0.3*Settings["Medium"]["TranslationMean"] ##meters
-    Settings["Medium"]["RotationNoise"]=2        ##degrees
+    Settings["Medium"]["RotationNoise"]=4        ##degrees
 
     Settings["Slow"]["TranslationMean"]=0.022
     Settings["Slow"]["RotationMean"]=2
@@ -45,8 +45,8 @@ def MotionCategorySettings():
 def noisyRotations(noise=5):
     out=np.zeros((3,1))
     out[0,0]=np.clip(np.random.normal(0,noise,1),-2,2)
-    out[1,0]=np.clip(np.random.normal(0,noise,1),-2,2)
-    out[2,0]=np.clip(np.random.normal(0,noise,1),-2,2)
+    out[1,0]=0.2*np.clip(np.random.normal(0,noise,1),-2,2)
+    out[2,0]=0.2*np.clip(np.random.normal(0,noise,1),-2,2)
     return out
 
 
@@ -61,8 +61,8 @@ def forwardTranslation(zBase=0.2,noise=0.1):
 def dominantRotation(yawBase=15,noise=5):
     out=np.zeros((3,1))
     out[0,0]=np.random.normal(0,noise,1)
-    out[1,0]=np.random.normal(0,noise,1) 
-    out[2,0]=np.clip(abs(np.random.normal(yawBase,noise,1)),0,40)
+    out[1,0]=0.2*np.random.normal(0,noise,1) 
+    out[2,0]=0.2*np.clip(abs(np.random.normal(yawBase,noise,1)),0,20)
     return out
 
 def genRandomCoordinate(xAvg,yAvg,zAvg):
@@ -87,6 +87,7 @@ def genTurningTransform(mSettings,nFrames=2):
     for i in range(0,nFrames-1):
         C=forwardTranslation(mSettings["TranslationMean"],mSettings["TranslationNoise"])
         Rtheta=dominantRotation(mSettings["RotationMean"],mSettings["RotationNoise"])
+        Rtheta[1]=Rtheta[1]*0.2
         setTransforms.append((Rtheta,C))
     return setTransforms  
 

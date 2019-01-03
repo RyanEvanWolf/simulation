@@ -11,9 +11,9 @@ def MotionCategorySettings():
     Settings["Fast"]["RotationNoise"]=8    ##degrees
 
     Settings["Medium"]["TranslationMean"]=0.044
-    Settings["Medium"]["RotationMean"]=20
-    Settings["Medium"]["TranslationNoise"]=0.5*Settings["Medium"]["TranslationMean"] ##meters
-    Settings["Medium"]["RotationNoise"]=4        ##degrees
+    Settings["Medium"]["RotationMean"]=8
+    Settings["Medium"]["TranslationNoise"]=0.2*Settings["Medium"]["TranslationMean"] ##meters
+    Settings["Medium"]["RotationNoise"]=2        ##degrees
 
     Settings["Slow"]["TranslationMean"]=0.022
     Settings["Slow"]["RotationMean"]=10

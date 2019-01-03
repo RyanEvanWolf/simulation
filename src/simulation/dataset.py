@@ -146,8 +146,8 @@ class stereo_simulator_node(slidingGraph):
             self.G.newPoseVertex()
             motions=genStraightTransform(self.mset["Medium"],nFrames)
         else:
-            motions=(genStraightTransform(self.mset["Medium"],3*15)+
-                    genTurningTransform(self.mset["Medium"],20)+genStraightTransform(self.mset["Medium"],3*15))
+            motions=(genStraightTransform(self.mset["Medium"],10*15)+
+                    genTurningTransform(self.mset["Medium"],30)+genStraightTransform(self.mset["Medium"],4*15))
         self.roll=[]
         self.pitch=[]
         self.yaw=[]
