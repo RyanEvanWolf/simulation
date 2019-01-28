@@ -16,7 +16,7 @@ import networkx as nx
 
 #rospy.init_node('ExtractMotion')
 
-rootFolder="/media/ryan/EXTRA/Simulation/400"
+rootFolder="/media/ryan/EXTRA/Simulation/50"
 setFiles=os.listdir(rootFolder)
 
 for f in setFiles:

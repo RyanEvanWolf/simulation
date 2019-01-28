@@ -26,56 +26,140 @@ sty.use("seaborn")
 from tf import TransformListener,TransformBroadcaster
 from tf.transformations import *
 
+#!/usr/bin/env python
 
-rospy.init_node("display_path")
 
-rootFolder="/media/ryan/EXTRA/Simulation"
+
+
+from bumblebee.motion import *
+
+from simulation.path import *
+from simulation.settings import *
+import tf.transformations
+from geometry_msgs.msg import TransformStamped,Transform,Quaternion,Vector3
+from bumblebee.baseTypes import basicGraph
+from simulation.dataset import stereo_simulator_node
+import pickle
+import os
+import rospy
+
+import time
+import scipy.stats.mstats as stat
+from scipy.stats import norm,cauchy
+import matplotlib.pyplot as plt
+import matplotlib.style as sty
+from mpl_toolkits.mplot3d import Axes3D
+sty.use("seaborn")
+import matplotlib.patches as mpatches
+
+gFitColor=[(0,1,0,0.4),
+            (0,0,1,.4),
+            (0.5,0,.5,0.4),
+            (1,0,0,0.4)]
+gNames=["0.05","0.1","0.2","0.3"]
+
+rootFolder="/media/ryan/EXTRA/Simulation/400"
 
 setFiles=os.listdir(rootFolder)
 
 
-idealGraph=None
-simGraph=[]
-fileName=[]
-listener =TransformListener() 
-for f in setFiles:
-    allFiles=rootFolder+"/"+f
-    print(allFiles)
-    with open(allFiles,"r") as fread:
-        print(allFiles)
-        if(f[f.rindex("."):]==".gauss"):
+rootFolder="/media/ryan/EXTRA/Simulation"
+outFolder="/media/ryan/EXTRA/outSim"
+
+nTracks=os.listdir(rootFolder)
+
+procTime=[]
+fig, ax=plt.subplots(1,1,sharey=True)
+
+names=['50','100','200','400']
+for n in names:
+    setFiles=sorted(os.listdir(rootFolder+"/"+n))
+    print(setFiles)
+    inliers=[]
+    rms=[]
+    count=0
+    for f in setFiles:
+        allFiles=rootFolder+"/"+n+"/"+f
+        with open(allFiles,"r") as fread:
+            inData=pickle.load(fread)
+            if(f[f.rindex("."):]==".simulation"):
+                pass
+            else:
+                procTime= procTime+inData.getMotionTime()
+                #fig.scatter(inData.getInlierMotion(),inData.getMotionTime(),color=gFitColor[count])
+                count+=1   
+ax.hist(procTime)
+#fig.savefig(outFolder+"/inliers.png",bbox_inches='tight')
+plt.show()
+# ###Get inliers RMS per frame
+# fig ,ax1=plt.subplots(1,1)
+# nInliers=[]
+# nRMS=[]
+# for f in setFiles:
+#     allFiles=rootFolder+"/"+f
+#     if(f[f.rindex("."):]==".gauss"):
+#         print(allFiles)
+#         with open(allFiles,"r") as fread:
+#             inData=pickle.load(fread)
+#             nInliers.append(inData.getInlierMotion())
+#             nRMS.append(inData.getInlierRMS())
+
+# for g in range(len(nInliers)):
+#     ax1.scatter(nInliers[g],nRMS[g],label=gNames[g],color=gCOlor[g])
+# fig.suptitle("$T_{track}=400$")
+# ax1.set_xlabel("Total Inlier Detections")
+# ax1.set_ylabel("Average Inlier Landmark RMS Error")
+# ax1.legend()
+
+# fig.savefig("/home/ryan/f3.png",dpi=300)
+
+
+plt.show()
+
+
+
+# idealGraph=None
+# simGraph=[]
+# fileName=[]
+# listener =TransformListener() 
+# for f in setFiles:
+#     allFiles=rootFolder+"/"+f
+#     print(allFiles)
+#     with open(allFiles,"r") as fread:
+#         print(allFiles)
+#         if(f[f.rindex("."):]==".gauss"):
         
-            with open(allFiles,"r") as fread:
-                simGraph.append(slidingGraph("g_"+str(len(simGraph))))
-                fileName.append(f)
-                simGraph[-1].G=pickle.load(fread)
-        else:
-            idealGraph=slidingGraph("ideal")
-            idealGraph.G=pickle.load(fread)
+#             with open(allFiles,"r") as fread:
+#                 simGraph.append(slidingGraph("g_"+str(len(simGraph))))
+#                 fileName.append(f)
+#                 simGraph[-1].G=pickle.load(fread)
+#         else:
+#             idealGraph=slidingGraph("ideal")
+#             idealGraph.G=pickle.load(fread)
 
 
-idealGraph.publishPoses()
-idealGraph.publishGlobalPoints()
-for s in simGraph:
-    s.publishPoses()
-time.sleep(2)
+# idealGraph.publishPoses()
+# idealGraph.publishGlobalPoints()
+# for s in simGraph:
+#     s.publishPoses()
+# time.sleep(2)
 
-for j in simGraph:
-    finalPose=idealGraph.G.getPoseVertices()[-1]
-    msg=listener.lookupTransform("ideal"+"/"+finalPose,j.displayName+"/"+finalPose,rospy.Time(0))
+# for j in simGraph:
+#     finalPose=idealGraph.G.getPoseVertices()[-1]
+#     msg=listener.lookupTransform("ideal"+"/"+finalPose,j.displayName+"/"+finalPose,rospy.Time(0))
     
-    x=msg[0][0]
-    y=msg[0][1]
-    z=msg[0][2]
+#     x=msg[0][0]
+#     y=msg[0][1]
+#     z=msg[0][2]
 
-    R=euler_from_quaternion(msg[1],'szxy')
-    r=degrees(R[0])
-    p=degrees(R[1])
-    y=degrees(R[2])
+#     R=euler_from_quaternion(msg[1],'szxy')
+#     r=degrees(R[0])
+#     p=degrees(R[1])
+#     y=degrees(R[2])
 
-    Tx=np.sqrt(x**2 +y**2 +z**2)
-    Rtheta=np.sqrt(r**2 +p**2+y**2)
-    print(j.displayName,Tx,Rtheta)
-print("finished")
-print(fileName)
-rospy.spin()
+#     Tx=np.sqrt(x**2 +y**2 +z**2)
+#     Rtheta=np.sqrt(r**2 +p**2+y**2)
+#     print(j.displayName,Tx,Rtheta)
+# print("finished")
+# print(fileName)
+# rospy.spin()

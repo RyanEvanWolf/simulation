@@ -1,0 +1,190 @@
+#!/usr/bin/env python
+
+
+
+
+from bumblebee.motion import *
+import copy
+from simulation.path import *
+from simulation.settings import *
+import tf.transformations
+from geometry_msgs.msg import TransformStamped,Transform,Quaternion,Vector3
+from bumblebee.baseTypes import basicGraph
+from simulation.dataset import stereo_simulator_node
+import pickle
+import os
+import rospy
+
+import time
+import scipy.stats.mstats as stat
+from scipy.stats import norm,cauchy
+import matplotlib.pyplot as plt
+import matplotlib.style as sty
+import matplotlib.patches as mpatches
+import matplotlib as mpl
+
+
+sty.use("seaborn")
+
+rootFolder="/media/ryan/EXTRA/Simulation"
+outFolder="/media/ryan/EXTRA/outSim"
+
+nTracks=os.listdir(rootFolder)
+
+graphData={}
+
+def getFolderData(nTracks):
+    data={}
+    setFiles=sorted(os.listdir(rootFolder+"/"+nTracks))
+    print(setFiles)
+    g=[]
+
+    for f in setFiles:
+        allFiles=rootFolder+"/"+nTracks+"/"+f
+        with open(allFiles,"r") as fread:
+            inData=pickle.load(fread)
+            if(f[f.rindex("."):]==".simulation"):
+                idealData=inData.getDeltaMotion()
+            else:
+                g.append(inData.getDeltaMotion())
+    print(len(g),len(idealData))
+    ############
+    ##process Data
+    angles=[]
+    translation=[]
+    for estimated in g:
+        gaussRt=[]
+        C=[]
+        for param in range(3):
+            error=list(np.array(estimated[param])-np.array(idealData[param]))
+            gaussRt.append(error)
+        for param in range(3,6):
+            error=list(np.array(estimated[param])-np.array(idealData[param]))
+            C.append(error)
+        translation.append(C)
+        angles.append(gaussRt)
+    return angles,translation
+
+a,t=getFolderData("50")
+a2,t2=getFolderData("100")
+a3,t3=getFolderData("200")
+a4,t4=getFolderData("400")
+
+
+def drawParam(ax,pdfAx,param,c):
+    ax.hist(param,bins=25,color=c)
+    mu,sigma = norm.fit(param)
+
+    x_pdf = np.linspace(np.min(param),np.max(param), 100)
+    y_pdf=norm.pdf(x_pdf, mu, sigma)/sigma
+    pdfAx.plot(x_pdf,y_pdf,color=c[:3])
+
+
+# gColor=[(1,0,0,0.2),(0,1,0,.2),(0,0,1,0.2),(0.5,0.5,0,0.2)]
+
+gFitColor=[(0,1,0,0.2),
+            (0,0,1,.2),
+            (0.25,0.5,1,0.2),
+            (1,0,0,0.2)]
+noisePatches=[mpatches.Patch(color=gFitColor[0], label=r'$\sigma=0.05$'),
+                mpatches.Patch(color=gFitColor[1], label=r'$\sigma=0.1$'),
+              mpatches.Patch(color=gFitColor[2], label=r'$\sigma=0.2$'),
+              mpatches.Patch(color=gFitColor[3], label=r'$\sigma=0.3$')]
+
+
+
+
+# a1,aD1,t1,tD1=getFolderData("100")
+# #a2,aD2,t2,tD2=getFolderData("200")
+# #a3,aD3,t3,tD2=getFolderData("400")
+
+
+def genGraph():
+    F,G=plt.subplots(nrows=4, ncols=1,sharex=True,sharey=True)
+    F.subplots_adjust(hspace=0.04)
+    label_size = 18
+    mpl.rcParams['xtick.labelsize'] = label_size 
+    mpl.rcParams['ytick.labelsize'] = label_size 
+    G[0].set_yticklabels([])
+    G[0].grid(color=(0,0,0,0.4))
+    #G[0].set_ylabel("50",fontsize=13)
+    G[1].set_yticklabels([])
+    G[1].grid(color=(0,0,0,0.4))
+    #G[1].set_ylabel("100",fontsize=13)
+    G[2].set_yticklabels([])
+    G[2].grid(color=(0,0,0,0.4))
+    #G[2].set_ylabel("200",fontsize=13)
+    G[3].set_yticklabels([])
+    #G[3].set_ylabel("400",fontsize=13)
+    G[3].grid(color=(0,0,0,0.4))
+    twinAx=[G[0].twinx(),G[1].twinx(),G[2].twinx(),G[3].twinx()]
+    twinAx[0].grid('off')
+    twinAx[0].set_yticklabels([])   
+    twinAx[1].grid('off')
+    twinAx[1].set_yticklabels([])   
+    twinAx[2].grid('off')
+    twinAx[2].set_yticklabels([])   
+    twinAx[3].grid('off')
+    twinAx[3].set_yticklabels([])   
+    G[3].set_xlabel("")
+    G[3].tick_params('x',labelsize=label_size)
+    mpl.rcParams['xtick.labelsize'] = label_size 
+    mpl.rcParams['ytick.labelsize'] = label_size 
+    return F,G,twinAx
+
+########################
+##plot Roll
+##########################
+
+
+angleData=[a,a2,a3,a4]
+Tdata=[t,t2,t3,t4]
+
+rollF,rollGraph,rollTwin=genGraph()
+rollGraph[3].set_xlabel(r"$\beta$ error ($\circ$)",fontsize=20)
+
+
+
+
+PitchF,PitchGraph,PitchTwin=genGraph()
+PitchGraph[3].set_xlabel(r"$\gamma$ error ($\circ$)",fontsize=20)
+
+YawF,YawGraph,YawTwin=genGraph()
+YawGraph[3].set_xlabel(r"$\alpha$ error ($\circ$)",fontsize=20)
+
+XF,XGraph,XTwin=genGraph()
+XGraph[3].set_xlabel(r"X error (m)",fontsize=20)
+
+
+YF,YGraph,YTwin=genGraph()
+YGraph[3].set_xlabel(r"Y error (m)",fontsize=20)
+
+ZF,ZGraph,ZTwin=genGraph()
+ZGraph[3].set_xlabel(r"Z error (m)",fontsize=20)
+
+
+for nlandmarks in range(len(angleData)):
+    for gaussNoise in range(0,4):
+        drawParam(rollGraph[nlandmarks],rollTwin[nlandmarks],angleData[nlandmarks][gaussNoise][0],
+                    gFitColor[gaussNoise])
+        drawParam(PitchGraph[nlandmarks],PitchTwin[nlandmarks],angleData[nlandmarks][gaussNoise][1],
+                    gFitColor[gaussNoise])
+        drawParam(YawGraph[nlandmarks],YawTwin[nlandmarks],angleData[nlandmarks][gaussNoise][2],
+                    gFitColor[gaussNoise])
+        drawParam(XGraph[nlandmarks],XTwin[nlandmarks],Tdata[nlandmarks][gaussNoise][0],
+                    gFitColor[gaussNoise])
+        drawParam(YGraph[nlandmarks],YTwin[nlandmarks],Tdata[nlandmarks][gaussNoise][1],
+                    gFitColor[gaussNoise])
+        drawParam(ZGraph[nlandmarks],ZTwin[nlandmarks],Tdata[nlandmarks][gaussNoise][2],
+                    gFitColor[gaussNoise])
+
+ZF.savefig(outFolder+"/Z.png",bbox_inches='tight',dpi=150)
+XF.savefig(outFolder+"/X.png",bbox_inches='tight',dpi=150)
+YF.savefig(outFolder+"/Y.png",bbox_inches='tight',dpi=150)
+rollF.savefig(outFolder+"/roll.png",bbox_inches='tight',dpi=150)
+PitchF.savefig(outFolder+"/pitch.png",bbox_inches='tight',dpi=150)
+YawF.savefig(outFolder+"/yaw.png",bbox_inches='tight',dpi=150)
+
+plt.show()
+
+

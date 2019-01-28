@@ -22,9 +22,7 @@ import matplotlib.pyplot as plt
 import matplotlib.style as sty
 sty.use("seaborn")
 
-
-
-rootFolder="/media/ryan/EXTRA/Simulation/200"
+rootFolder="/media/ryan/EXTRA/Simulation/50"
 
 setFiles=os.listdir(rootFolder)
 
@@ -35,12 +33,12 @@ for f in setFiles:
             idealData=pickle.load(fread)
     print(f[f.rindex("."):])
 
-fig,(ax1,ax2,ax3)=plt.subplots(nrows=3, ncols=1)#,sharex=True,squeeze=True)
+fig,(ax1,ax2,ax3)=plt.subplots(nrows=3, ncols=1,sharex=True)#,sharex=True,squeeze=True)
 fig2,(ax4,ax5,ax6)=plt.subplots(nrows=3, ncols=1)
 
-ax1.set_xlabel("Roll (degrees)")
-ax2.set_xlabel("Pitch (degrees)")
-ax3.set_xlabel("Yaw (degrees)")
+ax1.set_xlabel(r"$\beta^\circ$")
+ax2.set_xlabel(r"$\gamma^\circ$")
+ax3.set_xlabel(r"$\alpha^\circ$")
 
 ax4.set_xlabel("X (m)")
 ax5.set_xlabel("Y (m)")
@@ -48,8 +46,8 @@ ax6.set_xlabel("Z (m)")
 ax5.set_ylabel("Total $KF$")
 ax2.set_ylabel("Total $KF$")
 
-fig.suptitle("Orientation Error $T_{track}=200$")
-fig2.suptitle("Translation Error $T_{track}=200$")
+fig.suptitle("Orientation Error $T_{track}=50$")
+fig2.suptitle("Translation Error $T_{track}=50$")
 setAxis=(ax1,ax2,ax3,ax4,ax5,ax6)
 ideal=idealData.getDeltaMotion()
 
@@ -73,32 +71,18 @@ for g in range(len(gaussGraphs)):
         setAxis[i].hist(error,color=gCOlor[g],bins=26,label=gNames[g])
 
         fake=setAxis[i].twinx()
-        mu,sigma = cauchy.fit(error)
+        mu,sigma = norm.fit(error)
+        print(gNames[g],i,mu,sigma)
         x_pdf = np.linspace(np.min(error),np.max(error), 100)
-        y_pdf=cauchy.pdf(x_pdf, mu, sigma)
+        y_pdf=norm.pdf(x_pdf, mu, sigma)
         
         fake.plot(x_pdf,y_pdf,color=lineColor[g],linestyle='dashed')
        # ax2.set_ylabel('Probability Density Function')
         fake.grid(False)
         fake.axis('off')
         setAxis[i].legend()
+
+fig2.savefig("/home/ryan/f2.png",dpi=300)
+fig.savefig("/home/ryan/f1.png",dpi=300)
+
 plt.show()
-
-# with open("/media/ryan/EXTRA/Simulation/data_100.simulation","r") as f:
-#     newData=pickle.load(f)
-# fig,(ax1,ax2,ax3)=plt.subplots(nrows=1, ncols=3)#,sharex=True,squeeze=True)
-# fig2,(ax4,ax5,ax6)=plt.subplots(nrows=1, ncols=3)
-
-# setAxis=(ax1,ax2,ax3,ax4,ax5,ax6)
-
-# d=newData.getDeltaMotion()
-
-
-# for i in range(len(gaussGraphs)):
-#     #print(len(ideal[i]),len(ga[i]),len(ga2[i]),len(ga4[i]))
-#     setAxis[i].plot(guassGraphs[i],linewidth=0.5)
-#   #  setAxis[i].plot(list(np.array(ideal[i])-np.array(ga[i])),linewidth=0.7,label="0.05")
-#   #  setAxis[i].plot(list(np.array(ideal[i])-np.array(ga2[i])),linewidth=0.7,label="0.1")
-#    #setAxis[i].plot(ideal[i]-ga4[i],linewidth=0.7,label="0.3")
-
-# plt.show()

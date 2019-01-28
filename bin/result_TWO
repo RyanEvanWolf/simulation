@@ -26,7 +26,7 @@ sty.use("seaborn")
 gCOlor=[(1,0,0,0.8),(0,1,0,0.8),(0,0,1,0.8),(0.5,0.5,0,0.8)]
 gNames=["0.05","0.1","0.2","0.3"]
 
-rootFolder="/media/ryan/EXTRA/Simulation/200"
+rootFolder="/media/ryan/EXTRA/Simulation/400"
 
 setFiles=os.listdir(rootFolder)
 ##################################
@@ -49,9 +49,13 @@ for f in setFiles:
 
 for g in range(len(nInliers)):
     ax1.scatter(nInliers[g],nRMS[g],label=gNames[g],color=gCOlor[g])
-fig.suptitle("$T_{track}=200$")
+fig.suptitle("$T_{track}=400$")
 ax1.set_xlabel("Total Inlier Detections")
 ax1.set_ylabel("Average Inlier Landmark RMS Error")
 ax1.legend()
+
+fig.savefig("/home/ryan/f3.png",dpi=300)
+
+
 plt.show()
 

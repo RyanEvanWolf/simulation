@@ -17,3 +17,7 @@ rosrun simulation extractMotion
 -----------------------------------
 This will populate the motion edges of the pose graph at the specified rootFolder.
 This folder entry maust be manually changed at line 19
+
+
+
+------------------------
